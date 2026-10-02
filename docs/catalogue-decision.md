@@ -1,6 +1,6 @@
 # Catalogue decision point
 
-Status: **OPEN. Needs the user before the catalogue expands (Home, Search and Results slices).** Until then the two seeded products stay (`src/db/seed-demo.ts`). We never import Amazon's catalogue, identifiers, descriptions or imagery.
+Status: **DECIDED (2026-10-02, user approved the recommended defaults).** Hand-authored dataset of 40 to 60 products; our own or openly licensed imagery with the licence recorded per image; placeholders acceptable for non-hero imagery; no Amazon catalogue, customer data, identifiers or private captured data. Nothing is built yet: the two seeded products stay (`src/db/seed-demo.ts`) until the Home and Search slices start. We never import Amazon's catalogue, identifiers, descriptions or imagery.
 
 ## Questions to decide
 
@@ -21,4 +21,4 @@ Status: **OPEN. Needs the user before the catalogue expands (Home, Search and Re
 
 ## Needs from the user
 
-Answers to 1 to 4 (even "your call, use the recommended defaults") before Home and Search work starts.
+Nothing further. Questions 1 to 4 are answered by the recommended defaults.
