@@ -1,44 +1,60 @@
 import { count } from "drizzle-orm";
-import { products, variants } from "@/db/schema";
+import { categories, products, variants } from "@/db/schema";
 import type { Database } from "@/server/app";
+import catalog from "./demo-catalog.json";
 
 /**
- * Our own demo catalogue (no Amazon data or identifiers). Two products, enough
- * for the tracer: one under and one over the free-shipping threshold, one with
- * deliberately low stock to exercise stock validation. Idempotent.
+ * Our own demo catalogue (src/db/demo-catalog.json): invented brands, our own
+ * flat illustrations (scripts/generate-product-art.mjs), no Amazon data or
+ * identifiers. Ratings and counts are demo values. Idempotent: seeds only an empty catalogue.
  */
 export async function seedDemoCatalog(db: Database) {
   const [{ value }] = await db.select({ value: count() }).from(products);
   if (value > 0) return;
 
-  await db.insert(products).values([
-    {
-      id: "prod-pour-over",
-      slug: "linden-ceramic-pour-over-set",
-      title: "Linden Ceramic Pour-Over Coffee Set",
-      brand: "Linden & Rye",
-      description:
-        "A matte ceramic dripper with a stainless drip tray and a 600 ml glazed carafe. The ribbed cone keeps the water in contact with the grounds for an even extraction, and the carafe is graduated so you can dose by eye. Dishwasher safe. Fits standard #2 cone filters (not included).",
+  await db.insert(categories).values(catalog.categories);
+  const categoryId = new Map(catalog.categories.map((c) => [c.slug, c.id]));
+
+  for (const p of catalog.products) {
+    const productId = `prod-${p.slug}`;
+    await db.insert(products).values({
+      id: productId,
+      slug: p.slug,
+      title: p.title,
+      brand: p.brand,
+      description: p.description,
       images: [
-        { url: "/products/pour-over-1.svg", alt: "Matte white ceramic pour-over dripper sitting on a glass carafe" },
-        { url: "/products/pour-over-2.svg", alt: "Overhead view of the ribbed dripper cone" },
+        { url: `/products/${p.slug}-1.svg`, alt: p.title },
+        { url: `/products/${p.slug}-2.svg`, alt: `${p.title}, detail view` },
       ],
-    },
-    {
-      id: "prod-mug-set",
-      slug: "ember-stoneware-mug-2-pack",
-      title: "Ember Stoneware Mug, 2-Pack",
-      brand: "Ember Studio",
-      description:
-        "Two 12 oz mugs thrown from speckled stoneware with a reactive glaze, so no two are exactly alike. A wide, comfortable handle and a thick rim hold heat. Microwave and dishwasher safe.",
-      images: [
-        { url: "/products/mug-1.svg", alt: "Two speckled terracotta stoneware mugs side by side" },
-        { url: "/products/mug-2.svg", alt: "Close-up of a mug handle and glaze" },
-      ],
-    },
-  ]);
-  await db.insert(variants).values([
-    { id: "var-pour-over", productId: "prod-pour-over", priceCents: 4200, listPriceCents: null, stock: 4 },
-    { id: "var-mug-set", productId: "prod-mug-set", priceCents: 1899, listPriceCents: 2499, stock: 12 },
-  ]);
+      categoryId: categoryId.get(p.category) ?? null,
+      ratingTenths: p.rating,
+      ratingCount: p.count,
+      featuredRank: "rank" in p ? p.rank : null,
+      createdAt: new Date(`${p.created}T09:00:00Z`),
+      bullets: p.bullets,
+      optionName: "optionName" in p ? p.optionName : null,
+    });
+    const rows =
+      "variants" in p && p.variants
+        ? p.variants.map((v) => ({
+            id: v.id,
+            productId,
+            label: v.label,
+            priceCents: v.price,
+            listPriceCents: null,
+            stock: v.stock,
+          }))
+        : [
+            {
+              id: "variantId" in p && p.variantId ? p.variantId : `var-${p.slug}`,
+              productId,
+              label: null,
+              priceCents: p.price,
+              listPriceCents: "list" in p ? p.list : null,
+              stock: p.stock,
+            },
+          ];
+    await db.insert(variants).values(rows);
+  }
 }
