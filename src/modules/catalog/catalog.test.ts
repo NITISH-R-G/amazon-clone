@@ -13,4 +13,13 @@ describe("catalog", () => {
 
     expect(await app.catalog.getProduct("nope")).toBeNull();
   });
+
+  it("T22: lists products with their variants, ordered by title", async () => {
+    const app = await createTestApp();
+
+    const list = await app.catalog.listProducts();
+
+    expect(list.map((p) => p.slug)).toEqual(["test-kettle", "test-mug"]);
+    expect(list[0].variants[0].priceCents).toBe(2999);
+  });
 });

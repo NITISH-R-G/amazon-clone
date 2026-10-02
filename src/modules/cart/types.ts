@@ -3,6 +3,7 @@ import type { Cents } from "@/lib/money";
 export type CartLine = {
   id: string;
   variantId: string;
+  productSlug: string;
   title: string;
   imageUrl: string | null;
   unitPriceCents: Cents;

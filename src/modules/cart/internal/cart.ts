@@ -48,6 +48,7 @@ export function createCart({ db, catalog }: CartDeps) {
       lines.push({
         id: item.id,
         variantId: item.variantId,
+        productSlug: variant.productSlug,
         title: variant.title,
         imageUrl: variant.imageUrl,
         unitPriceCents: variant.priceCents,

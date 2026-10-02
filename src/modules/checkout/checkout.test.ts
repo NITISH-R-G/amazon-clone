@@ -143,4 +143,3 @@ describe("checkout failure paths", () => {
     expect((await app.cart.getCart(g1)).lines[0].quantity).toBe(2);
   });
 });
-

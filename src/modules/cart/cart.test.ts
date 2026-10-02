@@ -14,6 +14,7 @@ describe("cart", () => {
     expect(cart.lines).toHaveLength(1);
     expect(cart.lines[0]).toMatchObject({
       variantId: "var-kettle",
+      productSlug: "test-kettle",
       quantity: 2,
       unitPriceCents: 2999,
       lineTotalCents: 5998,
@@ -126,4 +127,3 @@ describe("cart", () => {
     expect(cart.lines[0].quantity).toBe(1);
   });
 });
-

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Pour-over coffee set illustration">
+  <rect width="800" height="800" fill="#eef1ee"/>
+  <ellipse cx="400" cy="690" rx="230" ry="26" fill="#d5dbd5"/>
+  <!-- carafe -->
+  <path d="M270 400 h260 l22 270 a30 30 0 0 1 -30 32 h-244 a30 30 0 0 1 -30 -32 z" fill="#dfe8e6" stroke="#9db3ae" stroke-width="6"/>
+  <path d="M286 560 h228 l10 110 a20 20 0 0 1 -20 22 h-208 a20 20 0 0 1 -20 -22 z" fill="#6b4a3a" opacity="0.85"/>
+  <path d="M530 470 q80 10 74 80 q-6 70 -64 76" fill="none" stroke="#9db3ae" stroke-width="14" stroke-linecap="round"/>
+  <!-- drip tray -->
+  <rect x="250" y="384" width="300" height="22" rx="8" fill="#b8c2c0"/>
+  <!-- dripper cone -->
+  <path d="M255 190 h290 l-70 190 h-150 z" fill="#fbfbf8" stroke="#c9d1cc" stroke-width="6"/>
+  <path d="M300 200 l52 176 M345 200 l34 176 M400 200 v176 M455 200 l-34 176 M500 200 l-52 176" stroke="#e1e6e1" stroke-width="6" fill="none"/>
+  <ellipse cx="400" cy="190" rx="145" ry="16" fill="#f1f3ee" stroke="#c9d1cc" stroke-width="6"/>
+  <rect x="352" y="378" width="96" height="12" rx="6" fill="#c9d1cc"/>
+</svg>

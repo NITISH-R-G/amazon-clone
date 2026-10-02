@@ -26,6 +26,14 @@ export function createCatalog({ db }: CatalogDeps) {
       return { ...product, variants: rows };
     },
 
+    async listProducts(tx?: DbOrTx): Promise<Product[]> {
+      const d = tx ?? db;
+      const rows = await d.select().from(products).orderBy(asc(products.title));
+      if (rows.length === 0) return [];
+      const all = await d.select().from(variants).orderBy(asc(variants.id));
+      return rows.map((p) => ({ ...p, variants: all.filter((v) => v.productId === p.id) }));
+    },
+
     async getVariant(id: string, tx?: DbOrTx): Promise<VariantDetail | null> {
       const d = tx ?? db;
       const [row] = await d
