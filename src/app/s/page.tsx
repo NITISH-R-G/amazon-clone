@@ -21,6 +21,7 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
   const query = parseSearchParams(await searchParams);
   const app = await getApp();
   const result = await app.search.searchProducts(query);
+  const allCategories = result.items.length === 0 ? await app.catalog.listCategories() : [];
 
   const categoryName = result.facets.categories.find((c) => c.slug === query.categorySlug)?.name;
   const heading = query.text ? `Results for "${query.text}"` : (categoryName ?? (query.onSale ? "On sale" : "All products"));
@@ -54,6 +55,11 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           <FilterControls categories={result.facets.categories} />
         </aside>
         <div>
+          {result.relaxed && result.items.length > 0 ? (
+            <p role="status" className="mb-6 rounded-lg bg-muted px-4 py-3 text-sm">
+              No product matches every word in &ldquo;{query.text}&rdquo;. Showing products that match some of them.
+            </p>
+          ) : null}
           {result.items.length > 0 ? (
             <>
               <ProductGrid products={result.items} dense />
@@ -65,12 +71,27 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
                 <EmptyMedia variant="icon">
                   <SearchX aria-hidden="true" />
                 </EmptyMedia>
-                <EmptyTitle className="text-lg font-semibold">No products match</EmptyTitle>
-                <EmptyDescription>Try a different search, or remove a filter to see more.</EmptyDescription>
+                <EmptyTitle className="text-lg font-semibold">
+                  {query.text ? `No products match “${query.text}”` : "No products match these filters"}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {activeCount > 0
+                    ? "Remove a filter, or clear them all to see more."
+                    : "Check the spelling, or try a more general word."}
+                </EmptyDescription>
               </EmptyHeader>
-              <Button asChild>
-                <Link href="/s">Clear all filters</Link>
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                {activeCount > 0 ? (
+                  <Button asChild>
+                    <Link href={query.text ? `/s?k=${encodeURIComponent(query.text)}` : "/s"}>Clear all filters</Link>
+                  </Button>
+                ) : null}
+                {allCategories.map((c) => (
+                  <Button key={c.slug} asChild variant="outline">
+                    <Link href={`/s?c=${c.slug}`}>{c.name}</Link>
+                  </Button>
+                ))}
+              </div>
             </Empty>
           )}
         </div>

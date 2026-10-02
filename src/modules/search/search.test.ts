@@ -129,4 +129,34 @@ describe("search", () => {
     expect((await app.search.suggest("ke", 1)).length).toBe(1);
     expect(await app.search.suggest("")).toEqual([]);
   });
+  it("T45: filler words are ignored and one-letter typos still find the product", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+
+    expect(slugs(await app.search.searchProducts({ text: "pocket and the speaker" }))).toEqual(["pocket-speaker"]);
+
+    const typo = await app.search.searchProducts({ text: "pockt speker" });
+    expect(slugs(typo)).toEqual(["pocket-speaker"]);
+    expect(typo.relaxed).toBe(false);
+
+    // Short words are not fuzzed: "bag" must not match "bat", "tag" and the like.
+    expect((await app.search.searchProducts({ text: "xyz" })).total).toBe(0);
+  });
+
+  it("T46: when no product has every word, results with some of the words are shown and flagged", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+
+    const exact = await app.search.searchProducts({ text: "studio headphones" });
+    expect(slugs(exact)).toEqual(["studio-headphones"]);
+    expect(exact.relaxed).toBe(false);
+
+    const relaxed = await app.search.searchProducts({ text: "headphones walnut" });
+    expect(slugs(relaxed).sort()).toEqual(["studio-headphones", "walnut-cutting-board"]);
+    expect(relaxed.relaxed).toBe(true);
+  });
+
+  it("T47: a query with nothing in common with the catalogue is empty and not flagged relaxed", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+    const none = await app.search.searchProducts({ text: "something-that-does-not-exist" });
+    expect(none).toMatchObject({ total: 0, relaxed: false });
+  });
 });

@@ -44,6 +44,8 @@ export type SearchResult = {
   page: number;
   pageCount: number;
   pageSize: number;
+  /** True when no product matched every word, so products matching some of the words are shown. */
+  relaxed: boolean;
   facets: { categories: CategoryFacet[] };
 };
 

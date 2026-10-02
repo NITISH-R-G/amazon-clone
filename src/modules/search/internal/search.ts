@@ -28,6 +28,40 @@ function summarise(product: Product, categoryName: string | null): ProductSummar
   };
 }
 
+const FILLER = new Set(["a", "an", "and", "or", "the", "of", "for", "with", "in", "to"]);
+const wordsOf = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/** The words that carry meaning; if the query is only filler, keep it as typed. */
+function queryTokens(text: string): string[] {
+  const all = wordsOf(text);
+  const meaningful = all.filter((w) => !FILLER.has(w));
+  return meaningful.length > 0 ? meaningful : all;
+}
+
+/** True when `a` and `b` differ by at most `max` insertions, deletions or substitutions. */
+function withinEdits(a: string, b: string, max: number): boolean {
+  if (Math.abs(a.length - b.length) > max) return false;
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    previous = row;
+  }
+  return previous[b.length] <= max;
+}
+
+/** Substring match, or (for words of 4+ letters) a close spelling of a word in the product text. */
+function tokenMatches(token: string, haystack: string, haystackWords: string[]): boolean {
+  if (haystack.includes(token)) return true;
+  if (token.length < 4) return false;
+  const allowed = token.length >= 8 ? 2 : 1;
+  return haystackWords.some((w) => withinEdits(token, w, allowed));
+}
+
+type TextMode = "all" | "any";
+
 const byTitle = (a: Product, b: Product) => a.title.localeCompare(b.title);
 const minPrice = (p: Product) => Math.min(...p.variants.map((v) => v.priceCents));
 
@@ -47,10 +81,19 @@ export function createSearch({ catalog }: SearchDeps) {
     return { products, categories, byId };
   }
 
-  function matches(p: Product, q: SearchQuery, category: Category | undefined, ignoreCategory = false): boolean {
-    if (q.text) {
+  function matches(
+    p: Product,
+    q: SearchQuery,
+    category: Category | undefined,
+    mode: TextMode,
+    ignoreCategory = false,
+  ): boolean {
+    const tokens = q.text ? queryTokens(q.text) : [];
+    if (tokens.length > 0) {
       const haystack = `${p.title} ${p.brand} ${category?.name ?? ""} ${p.description}`.toLowerCase();
-      if (!q.text.toLowerCase().split(/\s+/).every((t) => haystack.includes(t))) return false;
+      const words = wordsOf(haystack);
+      const hit = (t: string) => tokenMatches(t, haystack, words);
+      if (!(mode === "all" ? tokens.every(hit) : tokens.some(hit))) return false;
     }
     if (!ignoreCategory && q.categorySlug && category?.slug !== q.categorySlug) return false;
     const price = minPrice(p);
@@ -68,7 +111,18 @@ export function createSearch({ catalog }: SearchDeps) {
     const { products, categories, byId } = await load();
     const catOf = (p: Product) => (p.categoryId ? byId.get(p.categoryId) : undefined);
 
-    const matched = products.filter((p) => matches(p, query, catOf(p))).sort(sorters[query.sort]);
+    const tokenCount = query.text ? queryTokens(query.text).length : 0;
+    let mode: TextMode = "all";
+    let matched = products.filter((p) => matches(p, query, catOf(p), mode));
+    // Nothing has every word: show products with some of them, and say so.
+    if (matched.length === 0 && tokenCount >= 2) {
+      const partial = products.filter((p) => matches(p, query, catOf(p), "any"));
+      if (partial.length > 0) {
+        mode = "any";
+        matched = partial;
+      }
+    }
+    matched = matched.sort(sorters[query.sort]);
 
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
     const pageCount = Math.max(1, Math.ceil(matched.length / pageSize));
@@ -77,12 +131,20 @@ export function createSearch({ catalog }: SearchDeps) {
       .slice((page - 1) * pageSize, page * pageSize)
       .map((p) => summarise(p, catOf(p)?.name ?? null));
 
-    const withoutCategory = products.filter((p) => matches(p, query, catOf(p), true));
+    const withoutCategory = products.filter((p) => matches(p, query, catOf(p), mode, true));
     const facetCategories: CategoryFacet[] = categories
       .map((c) => ({ slug: c.slug, name: c.name, count: withoutCategory.filter((p) => p.categoryId === c.id).length }))
       .filter((f) => f.count > 0);
 
-    return { items, total: matched.length, page, pageCount, pageSize, facets: { categories: facetCategories } };
+    return {
+      items,
+      total: matched.length,
+      page,
+      pageCount,
+      pageSize,
+      relaxed: mode === "any",
+      facets: { categories: facetCategories },
+    };
   }
 
   /** Short list for the search box: product titles first (title prefix, then any word prefix), then categories. */
