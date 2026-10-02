@@ -78,7 +78,7 @@ export function createOrders({ db }: OrdersDeps) {
       .select()
       .from(orders)
       .where(eq(orders.ownerKey, actorKey(actor)))
-      .orderBy(desc(orders.placedAt));
+      .orderBy(desc(orders.placedAt), desc(orders.number));
     return loadOrders(d, rows);
   }
 
@@ -104,7 +104,16 @@ export function createOrders({ db }: OrdersDeps) {
     return (await loadOrders(d, rows))[0] ?? null;
   }
 
-  return { createOrder, listOrders, findByIdempotencyKey, getOrder };
+  /** After sign-in or registration: orders placed as a guest join the account's history. */
+  async function claimGuestOrders(guestToken: string, userId: string, tx?: DbOrTx): Promise<void> {
+    const d = tx ?? db;
+    await d
+      .update(orders)
+      .set({ ownerKey: actorKey({ userId }) })
+      .where(eq(orders.ownerKey, actorKey({ guestToken })));
+  }
+
+  return { createOrder, listOrders, findByIdempotencyKey, getOrder, claimGuestOrders };
 }
 
 export type OrdersModule = ReturnType<typeof createOrders>;

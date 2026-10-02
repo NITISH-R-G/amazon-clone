@@ -137,5 +137,29 @@ describe("cart", () => {
     expect(sale).toMatchObject({ unitPriceCents: 12900, listPriceCents: 14900 });
     expect(regular.listPriceCents).toBeNull();
   });
+  it("T41: merging a guest cart into an account cart sums matching lines, clamped to stock, and empties the guest cart", async () => {
+    const app = await createTestApp();
+    const user = { userId: "u1" };
+    await app.cart.addItem(user, "var-kettle", 3);
+    await app.cart.addItem(g1, "var-kettle", 4); // stock is 5: 3 + 4 clamps to 5
+    await app.cart.addItem(g1, "var-mug", 1);
+
+    await app.cart.mergeGuestCart("g1", "u1");
+
+    const cart = await app.cart.getCart(user);
+    expect(cart.lines.map((l) => [l.variantId, l.quantity]).sort()).toEqual([
+      ["var-kettle", 5],
+      ["var-mug", 1],
+    ]);
+    expect((await app.cart.getCart(g1)).lines).toHaveLength(0);
+  });
+
+  it("T42: merging a guest cart into an empty account moves the lines, and a guest with no cart is a no-op", async () => {
+    const app = await createTestApp();
+    await app.cart.addItem(g1, "var-kettle", 2);
+    await app.cart.mergeGuestCart("g1", "u2");
+    await app.cart.mergeGuestCart("nobody", "u2");
+    expect((await app.cart.getCart({ userId: "u2" })).lines[0]).toMatchObject({ variantId: "var-kettle", quantity: 2 });
+  });
 });
 

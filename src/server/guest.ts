@@ -25,3 +25,8 @@ export async function ensureGuestActor(newToken: () => string): Promise<Actor> {
   }
   return { guestToken: token };
 }
+
+/** Server actions only: forgets the guest token once its cart and orders belong to an account. */
+export async function clearGuestToken(): Promise<void> {
+  (await cookies()).delete(COOKIE);
+}

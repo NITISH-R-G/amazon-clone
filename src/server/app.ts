@@ -1,6 +1,7 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import type * as schema from "@/db/schema";
 import type { Clock, IdGenerator } from "@/lib/ports";
+import { createAuth } from "@/modules/auth";
 import { createCart } from "@/modules/cart";
 import { createCatalog } from "@/modules/catalog";
 import { createCheckout } from "@/modules/checkout";
@@ -29,7 +30,8 @@ export function createApp({ db, clock, ids, payments }: AppDeps) {
   const orders = createOrders({ db });
   const checkout = createCheckout({ db, cart, catalog, orders, payments, clock, ids });
   const search = createSearch({ catalog });
-  return { db, catalog, cart, orders, checkout, search };
+  const auth = createAuth({ db, clock, ids });
+  return { db, catalog, cart, orders, checkout, search, auth };
 }
 
 export type App = ReturnType<typeof createApp>;

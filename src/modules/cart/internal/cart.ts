@@ -136,7 +136,23 @@ export function createCart({ db, catalog }: CartDeps) {
     if (cartId) await d.delete(cartItems).where(eq(cartItems.cartId, cartId));
   }
 
-  return { getCart, addItem, setQuantity, removeItem, restoreItem, clearCart };
+  /**
+   * After sign-in: the guest cart's lines join the account's cart (quantities add up,
+   * clamped to stock) and the guest cart is emptied. A guest with no cart is a no-op.
+   */
+  async function mergeGuestCart(guestToken: string, userId: string): Promise<void> {
+    const guest: Actor = { guestToken };
+    const guestCartId = await findCartId(db, guest);
+    if (!guestCartId) return;
+    const lines = await db
+      .select({ variantId: cartItems.variantId, quantity: cartItems.quantity })
+      .from(cartItems)
+      .where(and(eq(cartItems.cartId, guestCartId), isNull(cartItems.removedAt)));
+    for (const line of lines) await addItem({ userId }, line.variantId, line.quantity);
+    await db.delete(cartItems).where(eq(cartItems.cartId, guestCartId));
+  }
+
+  return { getCart, addItem, setQuantity, removeItem, restoreItem, clearCart, mergeGuestCart };
 }
 
 export type CartModule = ReturnType<typeof createCart>;
