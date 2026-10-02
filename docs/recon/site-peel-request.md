@@ -2,6 +2,18 @@
 
 The smallest set of Amazon captures that closes the reconstruction gaps found in Phase 0 (`docs/recon/README.md`, `amazon-flow-map.md`). Nothing here duplicates what `recon/` already has (home, sign-in step 1, deals frame, gift cards, account hub, profile hub, returns hub, help hub, recommendations grids, shell, footer, tokens). **Do not scrape the site**; capture only the states below.
 
+## Status after the first delivery (2026-10-02)
+
+| # | Required capture | Result |
+|---|---|---|
+| 1 | PDP, simple product | Delivered but in the "cannot ship to your location" state: **no price, quantity, Add to cart or Buy Now observed.** Re-capture from a shippable location (or a US delivery address) |
+| 4 | Search results | **Usable** (results, count, sort, facets, load-more). Empty and filtered-applied states still missing |
+| 6 | Cart with 2 to 3 items | **Usable** (4 items). Empty cart still missing |
+| 11 | Checkout review | **Not captured.** Delivered an early "kyc" step with loading placeholders; need the loaded review page with payment, delivery and items. Capture from a US throwaway account and a fake US address |
+| 15 | Sign-in step 2 + wrong-password | **Not captured.** Delivered step 1 again. Need the password page and the wrong-password error |
+
+Privacy: the checkout capture contains a real name and postal address (see `site-peel-inventory.md`); recapture with throwaway data.
+
 ## How to capture (applies to every item)
 
 - **Clean browser profile with extensions disabled.** The first recon was contaminated by extension DOM.

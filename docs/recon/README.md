@@ -21,6 +21,11 @@ Inspected 2026-10-02 (Phase 0). Method: file inventory with content hashing and 
 | [amazon-flow-map.md](amazon-flow-map.md) | Core journeys, evidence level per step |
 | [privacy-notes.md](privacy-notes.md) | Sensitive material in `recon/`, protection status, recapture needs |
 | [site-peel-request.md](site-peel-request.md) | Exact captures still needed (P0/P1) |
+| [site-peel-inventory.md](site-peel-inventory.md) | What `recon-v2/` actually contains, privacy check |
+| [site-peel-analysis.md](site-peel-analysis.md) | PDP, search, cart, checkout, sign-in findings; decisions; differentiation |
+| [asset-analysis.md](asset-analysis.md) | `recon-v2` assets by category A to D |
+| [design-evidence.md](design-evidence.md) | Tokens and styles supported by `recon-v2` |
+| [component-mapping.md](component-mapping.md) | Evidence to components to shadcn; route impact |
 
 ## Findings that change the plan
 
