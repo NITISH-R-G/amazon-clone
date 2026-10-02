@@ -1,10 +1,6 @@
 /** Money is integer cents (USD). Never floats. */
 export type Cents = number;
 
-export function isCents(value: unknown): value is Cents {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-
 /** "$1,234.56" for display only; arithmetic stays in cents. */
 export function formatUsd(cents: Cents): string {
   const whole = Math.trunc(cents / 100);

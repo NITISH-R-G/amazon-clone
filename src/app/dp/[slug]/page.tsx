@@ -31,8 +31,8 @@ export default async function ProductPage({ params }: PageProps<"/dp/[slug]">) {
           <h1 className="text-2xl font-bold leading-tight">{product.title}</h1>
         </div>
         <Separator />
-        <PriceBlock cents={variant.priceCents} listCents={variant.listPriceCents} size="lg" />
-        <Separator />
+        <PriceBlock cents={variant.priceCents} listCents={variant.listPriceCents} size="lg" className="lg:hidden" />
+        <Separator className="lg:hidden" />
         <section aria-labelledby="about">
           <h2 id="about" className="mb-2 font-bold">
             About this item
@@ -41,8 +41,8 @@ export default async function ProductPage({ params }: PageProps<"/dp/[slug]">) {
         </section>
       </div>
 
-      <Card className="h-fit space-y-4 p-4 lg:sticky lg:top-4">
-        <PriceBlock cents={variant.priceCents} size="lg" />
+      <Card className="h-fit gap-4 p-4 lg:sticky lg:top-4">
+        <PriceBlock cents={variant.priceCents} listCents={variant.listPriceCents} size="lg" className="max-lg:hidden" />
         <AddToCartForm variantId={variant.id} stock={variant.stock} />
       </Card>
     </article>

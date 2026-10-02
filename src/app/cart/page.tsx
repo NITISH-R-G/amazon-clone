@@ -63,7 +63,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
       ) : null}
 
       {cart.lines.length === 0 ? (
-        <Card className="items-center space-y-3 p-10 text-center">
+        <Card className="items-center gap-3 p-10 text-center">
           <h2 className="text-lg font-bold">Your cart is empty</h2>
           <p className="text-muted-foreground">Add something from the shop and it will show up here.</p>
           <Button asChild>
@@ -107,7 +107,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
             </ul>
           </Card>
 
-          <Card className="h-fit space-y-4 p-4">
+          <Card className="h-fit gap-4 p-4">
             <p className="text-lg">
               Subtotal ({cart.itemCount} {cart.itemCount === 1 ? "item" : "items"}):{" "}
               <span className="font-bold">{formatUsd(cart.subtotalCents)}</span>

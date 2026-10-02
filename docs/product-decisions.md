@@ -29,6 +29,9 @@ Evidence references are to `docs/recon/` (page-map, component-inventory, flow-ma
 | D13 | Payment realism | Constraint (no real money) | n/a | A6 |
 | D14 | Logo and imagery | Constraint (legal) | Observed (sprite logo, third-party photos) | A0 |
 | D15 | Scope boundaries | Constraint | n/a | all |
+| D16 | Provisional tracer layouts | Our own design, no source | None | A1 |
+| D17 | Checkout form behaviour | Improvement (additive) | Our own manual run | A1 |
+| D18 | Visual identity (tracer) | Constraint + our own | Observed tokens | A1 |
 
 ---
 
@@ -151,6 +154,33 @@ Amazon's logo exists only as a trademarked sprite and the photos are third-party
 ## D15. Scope boundaries (constraint)
 
 Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller features, digital content, Fresh/local market, gift-card purchase (the Gift Cards page is a card-pattern reference only), localisation.
+
+## D16. Provisional tracer layouts (PDP, cart, checkout)
+
+- **Observed evidence**: none. `recon-v2/` does not exist yet; the five required captures had not arrived when the tracer was built. D4, D5 and D6 remain on Hold.
+- **Problem/opportunity**: the tracer needs real pages to prove the purchase path, without inventing Amazon-specific structure.
+- **Decision**: our own provisional layouts: PDP as gallery | details | buy box on desktop and a single column on mobile; cart as a line list with a subtotal panel; checkout as one page (address, payment, sticky summary). Labelled provisional everywhere; no Amazon copy or structure claimed.
+- **Reason**: conventional commerce patterns, cheap to replace once source arrives; the module layer underneath does not change.
+- **Tradeoff**: visual fidelity to Amazon is unknown and likely to need rework in A4/A5/A6.
+- **Validation method**: compare against the Site Peel PDP, cart and checkout-review captures when supplied; update D4/D5/D6 from Hold to decisions.
+
+## D17. Checkout form behaviour (tracer)
+
+- **Observed evidence**: Amazon checkout is not captured. Manual run of our form (desktop and 375 px) plus Impeccable critique found: the error banner sat off-screen after a failed submit, the expiry needed a typed slash, the total was not visible next to the buy button, and card-field values were lost after errors.
+- **Problem/opportunity**: avoidable errors and uncertainty at the highest-risk step.
+- **Decision**: focus and announce the error summary after a failed submit; group the card number and insert the expiry slash while typing; show the order total in the primary button; re-fill non-sensitive fields after an error but never card data; one stable idempotency key per rendered form so a double click cannot place two orders.
+- **Reason**: fewer failed attempts and a visible total before commitment (D10).
+- **Tradeoff**: small client-side formatting code; card fields are cleared after a decline (safer).
+- **Validation method**: domain tests T9, T11, T20, T21 for the server behaviour; manual run; tier-1 E2E.
+
+## D18. Visual identity for the tracer
+
+- **Observed evidence**: Amazon's tokens are measured in `docs/recon/design-tokens.md` (yellow CTA, teal links, dark header). Its logo is a trademark and its font is proprietary and was not captured.
+- **Problem/opportunity**: be recognisably a shopping product without reproducing Amazon's brand.
+- **Decision**: keep proven commerce colour roles (yellow primary action, red price/deal, green stock, teal links, dark navy header) with a placeholder wordmark ("Cartly"), our own flat SVG product illustrations, and Inter as the substitute typeface. The Impeccable detector flags Inter as an overused font; kept deliberately for now.
+- **Reason**: familiar affordances reduce learning cost; own marks avoid trademark and copyright exposure.
+- **Tradeoff**: the typeface is generic; revisit in the P1 Impeccable pass.
+- **Validation method**: Impeccable detector on the rendered pages (structural findings: none); user decisions still open on logo and font.
 
 ## Review log
 

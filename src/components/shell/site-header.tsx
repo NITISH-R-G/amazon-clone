@@ -29,10 +29,13 @@ export async function SiteHeader() {
           <ShoppingCart aria-hidden="true" className="size-5" />
           <span className="text-sm font-medium">Cart</span>
           <span
-            aria-label={`${count} ${count === 1 ? "item" : "items"} in cart`}
+            aria-hidden="true"
             className="min-w-6 rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-bold text-primary-foreground"
           >
             {count}
+          </span>
+          <span className="sr-only">
+            , {count} {count === 1 ? "item" : "items"} in cart
           </span>
         </Link>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { placeOrderAction } from "@/app/actions";
 import type { FormState } from "@/app/form-state";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,20 @@ type Field = {
   optional?: boolean;
   className?: string;
   maxLength?: number;
+  /** Formats the value as the user types (card number grouping, expiry slash). */
+  format?: (raw: string) => string;
+};
+
+const formatCardNumber = (raw: string) =>
+  raw
+    .replace(/\D/g, "")
+    .slice(0, 19)
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+
+const formatExpiry = (raw: string) => {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
 };
 
 const addressFields: Field[] = [
@@ -31,8 +45,8 @@ const addressFields: Field[] = [
 ];
 
 const cardFields: Field[] = [
-  { name: "cardNumber", label: "Card number", autoComplete: "cc-number", inputMode: "numeric", placeholder: "4242 4242 4242 4242", className: "sm:col-span-2", maxLength: 23 },
-  { name: "expiry", label: "Expiry (MM/YY)", autoComplete: "cc-exp", placeholder: "12/30", maxLength: 5 },
+  { name: "cardNumber", label: "Card number", autoComplete: "cc-number", inputMode: "numeric", placeholder: "4242 4242 4242 4242", className: "sm:col-span-2", maxLength: 23, format: formatCardNumber },
+  { name: "expiry", label: "Expiry (MM/YY)", autoComplete: "cc-exp", placeholder: "12/30", maxLength: 5, format: formatExpiry },
   { name: "cvc", label: "Security code", autoComplete: "cc-csc", inputMode: "numeric", placeholder: "123", maxLength: 4 },
 ];
 
@@ -46,6 +60,12 @@ type Summary = {
 
 export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: string; summary: Summary }) {
   const [state, action, pending] = useActionState<FormState, FormData>(placeOrderAction, {});
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  // After a failed submit, bring the error into view and announce it.
+  useEffect(() => {
+    if (state.error) errorRef.current?.focus();
+  }, [state]);
 
   const renderField = (f: Field) => {
     const error = state.fieldErrors?.[f.name];
@@ -64,6 +84,7 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
           maxLength={f.maxLength}
           required={!f.optional}
           defaultValue={state.values?.[f.name]}
+          onChange={f.format ? (e) => (e.target.value = f.format!(e.target.value)) : undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
         />
@@ -83,18 +104,23 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
 
       <div className="space-y-4">
         {state.error ? (
-          <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm font-medium text-destructive">
+          <p
+            ref={errorRef}
+            tabIndex={-1}
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-card p-3 text-sm font-medium text-destructive outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+          >
             {state.error}
           </p>
         ) : null}
 
-        <Card className="space-y-4 p-4">
+        <Card className="gap-4 p-4">
           <h2 className="text-lg font-bold">1. Shipping address</h2>
           <p className="text-sm text-muted-foreground">Demo store: shipping within the United States only.</p>
           <div className="grid gap-4 sm:grid-cols-2">{addressFields.map(renderField)}</div>
         </Card>
 
-        <Card className="space-y-4 p-4">
+        <Card className="gap-4 p-4">
           <h2 className="text-lg font-bold">2. Payment</h2>
           <p className="text-sm text-muted-foreground">
             Demo payment: no card is charged. Use 4242 4242 4242 4242 to succeed, or 4000 0000 0000 0002 to see a decline.
@@ -103,7 +129,7 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
         </Card>
       </div>
 
-      <Card className="h-fit space-y-3 p-4 lg:sticky lg:top-4">
+      <Card className="h-fit gap-3 p-4 lg:sticky lg:top-4">
         <h2 className="text-lg font-bold">Order summary</h2>
         <ul className="space-y-1 text-sm">
           {summary.lines.map((l) => (
@@ -134,7 +160,7 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
           </div>
         </dl>
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Placing your order..." : "Place your order"}
+          {pending ? "Placing your order..." : `Place your order · ${formatUsd(summary.totalCents)}`}
         </Button>
         <p className="text-xs text-muted-foreground">You will not be charged: this is a demo.</p>
       </Card>

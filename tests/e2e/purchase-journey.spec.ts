@@ -40,5 +40,5 @@ test("a guest can buy a product from product page to confirmation", async ({ pag
   await expect(page.getByTestId("order-total")).toHaveText(item.total);
 
   // The cart was emptied by the order.
-  await expect(page.getByLabel("0 items in cart")).toBeVisible();
+  await expect(page.getByRole("link", { name: /0 items in cart/ })).toBeVisible();
 });

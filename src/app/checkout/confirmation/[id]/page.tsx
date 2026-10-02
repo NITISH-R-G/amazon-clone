@@ -21,7 +21,7 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Card className="space-y-2 p-6">
+      <Card className="gap-2 p-6">
         <div className="flex items-center gap-3 text-success">
           <CheckCircle2 aria-hidden="true" className="size-8" />
           <h1 className="text-2xl font-bold">Order placed, thank you!</h1>
@@ -32,7 +32,7 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
         </p>
       </Card>
 
-      <Card className="space-y-4 p-6">
+      <Card className="gap-4 p-6">
         <h2 className="text-lg font-bold">Items</h2>
         <ul className="divide-y">
           {order.items.map((item) => (
@@ -71,7 +71,7 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="space-y-1 p-6 text-sm">
+        <Card className="gap-1 p-6 text-sm">
           <h2 className="mb-1 text-lg font-bold">Shipping to</h2>
           <p>{order.address.name}</p>
           <p>{order.address.line1}</p>
@@ -80,7 +80,7 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
             {order.address.city}, {order.address.region} {order.address.postalCode}
           </p>
         </Card>
-        <Card className="space-y-1 p-6 text-sm">
+        <Card className="gap-1 p-6 text-sm">
           <h2 className="mb-1 text-lg font-bold">Payment</h2>
           <p className="capitalize">
             {order.payment.brand} ending in {order.payment.last4}

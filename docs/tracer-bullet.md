@@ -99,3 +99,13 @@ T1 to T13 were implemented exactly as specified, one RED then GREEN at a time. T
 | ESLint `no-restricted-imports` | Enforces "import modules only through `index.ts`" and "modules do not import `app/` or `components/`" |
 
 Authorising payment inside the database transaction is deliberate for the demo provider (synchronous, no money moves). A real provider would need a two-phase flow; out of scope.
+
+## Phase 1 outcome
+
+- Domain: T1 to T22 green (22 tests, real PGlite database; only Clock, IdGenerator and PaymentProvider faked). T22 (`catalog.listProducts`) backs the temporary tracer index page.
+- UI: `/` (temporary index), `/dp/[slug]`, `/cart`, `/checkout`, `/checkout/confirmation/[id]` with loading, error, empty, not-found, declined, invalid-input and sold-out states. Layouts are our own and provisional (D16); no PDP/cart/checkout source existed.
+- Verification: manual browser pass at desktop and 375 px (add, clamp to stock, remove and undo, validation errors, declined card, successful order, sold-out PDP); tier-1 E2E purchase journey passes on desktop and mobile Chrome projects against a production build and in-memory database.
+- Not verified in a browser: stock running out between cart and "Place order" (covered by domain test T10 only).
+- Impeccable: detector run on source (no findings) and rendered pages (one `overused-font` warning for Inter, deliberate, D18); critique run single-context because sub-agents were not authorised; fixes applied (card spacing, cart link accessible name, error focus, input formatting, total in the buy button, duplicate PDP price).
+- Code review (inline, same checklist as the `code-review` skill): fixed an unused export (`isCents`) and the missing `secure` flag on the guest cookie in production. Noted, not changed: payment is authorised inside the DB transaction (demo only), `createApp` is typed to PGlite (revisit at deploy), duplicate cart error message maps in `actions.ts` and the cart page.
+- Architecture survey (condensed, using the codebase-design vocabulary; no HTML report): strongest candidate is a batched `catalog.getVariants(ids)` to remove the per-line `getVariant` calls in `cart.getCart`. Recommendation strength: Worth exploring, **not implemented**: two products and one-line carts give no evidence of cost yet. Revisit when the catalogue and search arrive.

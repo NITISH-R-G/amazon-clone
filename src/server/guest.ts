@@ -15,7 +15,13 @@ export async function ensureGuestActor(newToken: () => string): Promise<Actor> {
   let token = jar.get(COOKIE)?.value;
   if (!token) {
     token = newToken();
-    jar.set(COOKIE, token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+    jar.set(COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
   }
   return { guestToken: token };
 }

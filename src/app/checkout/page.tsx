@@ -16,7 +16,7 @@ export default async function CheckoutPage() {
 
   if (!cart || !quote || !quote.ok) {
     return (
-      <Card className="mx-auto max-w-md items-center space-y-3 p-10 text-center">
+      <Card className="mx-auto max-w-md items-center gap-3 p-10 text-center">
         <h1 className="text-xl font-bold">Your cart is empty</h1>
         <p className="text-muted-foreground">Add something to your cart before checking out.</p>
         <Button asChild>
@@ -28,7 +28,7 @@ export default async function CheckoutPage() {
 
   if (cart.lines.some((l) => !l.available)) {
     return (
-      <Card className="mx-auto max-w-md items-center space-y-3 p-10 text-center">
+      <Card className="mx-auto max-w-md items-center gap-3 p-10 text-center">
         <h1 className="text-xl font-bold">Check your cart</h1>
         <p role="alert" className="text-destructive">
           An item in your cart is no longer available in the quantity you chose.
