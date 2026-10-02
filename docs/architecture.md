@@ -131,4 +131,3 @@ TypeScript `strict`; no `any` without a written reason. Server components by def
 4. Add a reconciliation path for approved-but-unrecorded payments.
 
 The `PaymentProvider` port, the idempotency key and the order status field are the seams that keep this change local to `checkout`.
-
