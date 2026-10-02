@@ -17,6 +17,8 @@ export type OrderItem = {
   unitPriceCents: Cents;
   quantity: number;
   imageUrl: string | null;
+  sku: string | null;
+  variantLabel: string | null;
 };
 
 export type OrderStatus = "placed" | "shipped" | "out_for_delivery" | "delivered" | "cancelled";

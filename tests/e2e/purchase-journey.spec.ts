@@ -173,6 +173,7 @@ test("variants: choosing colour and storage resolves a real variant that survive
 
   await expect(page).toHaveURL(/\/cart/);
   await expect(page.getByRole("link", { name: new RegExp(`${phone.title}.*${label.split(", ")[0]}`) }).first()).toBeVisible();
+  await expect(page.getByText(`SKU ${chosenSku}`)).toBeVisible(); // the cart shows the exact variant
   const total = await cartTotalText(page);
   await page.getByRole("link", { name: "Checkout" }).click();
   await fillShipping(page);
@@ -181,6 +182,7 @@ test("variants: choosing colour and storage resolves a real variant that survive
 
   await expect(page.getByRole("heading", { name: /Order placed/ })).toBeVisible();
   await expect(page.getByText(`${phone.title} (${label})`)).toBeVisible();
+  await expect(page.getByText(`SKU ${chosenSku}`)).toBeVisible(); // and so does the order
   await expect(page.getByTestId("order-total")).toHaveText(total);
 });
 

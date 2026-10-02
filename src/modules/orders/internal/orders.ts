@@ -19,12 +19,14 @@ function toOrder(row: OrderRow, items: ItemRow[], now: Date): Order {
     number: row.number,
     items: items
       .filter((i) => i.orderId === row.id)
-      .map(({ variantId, title, unitPriceCents, quantity, imageUrl }) => ({
+      .map(({ variantId, title, unitPriceCents, quantity, imageUrl, sku, variantLabel }) => ({
         variantId,
         title,
         unitPriceCents,
         quantity,
         imageUrl,
+        sku,
+        variantLabel,
       })),
     subtotalCents: row.subtotalCents,
     shippingCents: row.shippingCents,

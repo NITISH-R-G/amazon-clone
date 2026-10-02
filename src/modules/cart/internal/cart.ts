@@ -51,6 +51,8 @@ export function createCart({ db, catalog }: CartDeps) {
         productSlug: variant.productSlug,
         title: variant.title,
         imageUrl: variant.imageUrl,
+        sku: variant.sku,
+        variantLabel: variant.label,
         unitPriceCents: variant.priceCents,
         listPriceCents:
           variant.listPriceCents !== null && variant.listPriceCents > variant.priceCents ? variant.listPriceCents : null,

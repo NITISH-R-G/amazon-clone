@@ -142,4 +142,25 @@ describe("checkout failure paths", () => {
     expect(payments.calls).toHaveLength(0);
     expect((await app.cart.getCart(g1)).lines[0].quantity).toBe(2);
   });
+
+  it("T68: the chosen variant (SKU and options) is kept from the cart into the order", async () => {
+    const app = await createTestApp({ ids: fixedIds({ orderNumbers: ["ORD-VAR-1"] }) });
+    await app.cart.addItem(g1, "var-mug", 1);
+
+    const cart = await app.cart.getCart(g1);
+    expect(cart.lines[0]).toMatchObject({ variantId: "var-mug", sku: "SKU-MUG-SPK-350", variantLabel: "Speckled, 350 ml" });
+
+    const placed = await app.checkout.placeOrder(g1, {
+      address: { name: "A B", line1: "1 Test St", city: "Testville", region: "TS", postalCode: "12345", country: "US" },
+      contactEmail: "a@example.test",
+      payment: { number: "4242424242424242", expiry: "12/30", cvc: "123" },
+      idempotencyKey: "k-var",
+    });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    expect(placed.value.items[0]).toMatchObject({ variantId: "var-mug", sku: "SKU-MUG-SPK-350", variantLabel: "Speckled, 350 ml" });
+    // The snapshot is read back unchanged.
+    const read = await app.orders.getOrder(g1, placed.value.id);
+    expect(read?.items[0]).toMatchObject({ sku: "SKU-MUG-SPK-350", variantLabel: "Speckled, 350 ml" });
+  });
 });

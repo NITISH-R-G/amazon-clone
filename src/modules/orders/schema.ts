@@ -35,4 +35,7 @@ export const orderItems = pgTable("order_items", {
   unitPriceCents: integer("unit_price_cents").notNull(),
   quantity: integer("quantity").notNull(),
   imageUrl: text("image_url"),
+  /** Purchase-time snapshot of the variant that was bought. */
+  sku: text("sku"),
+  variantLabel: text("variant_label"),
 });

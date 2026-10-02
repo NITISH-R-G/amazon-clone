@@ -3,6 +3,9 @@ import type { Cents } from "@/lib/money";
 export type CartLine = {
   id: string;
   variantId: string;
+  /** Stock-keeping unit and the options chosen ("Black, 256 GB, 8 GB"): the identity of what was selected. */
+  sku: string | null;
+  variantLabel: string | null;
   productSlug: string;
   title: string;
   imageUrl: string | null;

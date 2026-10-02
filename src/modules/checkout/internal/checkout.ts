@@ -83,6 +83,8 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
               unitPriceCents: l.unitPriceCents,
               quantity: l.quantity,
               imageUrl: l.imageUrl,
+              sku: l.sku,
+              variantLabel: l.variantLabel,
             })),
             ...quote,
             address: input.address,

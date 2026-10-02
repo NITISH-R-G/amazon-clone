@@ -32,6 +32,6 @@ export async function seedFixtures(db: Database) {
   ]);
   await db.insert(variants).values([
     { id: "var-kettle", productId: "prod-kettle", priceCents: 2999, stock: 5 },
-    { id: "var-mug", productId: "prod-mug", priceCents: 1200, stock: 1 },
+    { id: "var-mug", productId: "prod-mug", label: "Speckled, 350 ml", sku: "SKU-MUG-SPK-350", selections: { finish: "Speckled", capacity: "350 ml" }, priceCents: 1200, stock: 1 },
   ]);
 }
