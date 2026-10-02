@@ -227,6 +227,14 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Catalogue:** overrides the earlier "40 to 60 hand-authored products" default (`docs/catalogue-decision.md`) on the user's explicit instruction. The data is generated deterministically from our own product types, invented brands and attribute vocabularies, and is clearly synthetic. No Amazon data, identifiers or imagery.
 - **Why:** a believable catalogue changes how search, filters, pagination and rails behave, and a real database is a precondition for a live system. Plan, evidence and cut order: `docs/scale-up-plan.md`.
 
+## D24. Order lifecycle: derived status on a compressed demo timeline; cancel until it ships
+
+- **Derived, not stored.** An order's status is computed on read from `placedAt`, one stored fact (`cancelledAt`) and the injected clock. No worker, cron or queue.
+- **Demo timeline (simulated, labelled as such in the UI):** shipped after 5 minutes, out for delivery after 30 minutes, delivered after 2 hours. Real retail takes days; a compressed clock lets a reviewer watch an order progress. All thresholds are in one file (`orders/internal/lifecycle.ts`).
+- **Cancellation:** allowed only while the order is Placed (the first 5 minutes). It is final, restores stock in the same transaction, and needs no refund because payments are simulated.
+- **Product page delivery estimate:** "Get it by ..." uses the same function as the order (`estimatedDeliveryFrom`), so the promise and the order always agree.
+- **Search ranking (explainable):** title words rank above brand, then description; a matching category name adds a little; ties go to featured rank, then review count. Misspellings are matched by trigram word similarity (threshold 0.5), only after an exact reading finds nothing.
+
 ## Review log
 
 | Date | Decision | Change |

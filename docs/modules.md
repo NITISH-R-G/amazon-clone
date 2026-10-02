@@ -21,7 +21,7 @@ Eight deep modules; no `pricing` and no `product` module (product display is a v
 ## catalog
 
 1. **Responsibility**: products, variants, categories, prices, stock, images; the source of truth for what is for sale and whether it is available. Also decrements stock for a placed order.
-2. **Public interface**: `getProduct(slug) → Product | null` · `getVariant(id) → Variant | null` · `listProducts({ categoryId?, ids?, limit? }) → Product[]` · `listCategories() → Category[]` · `getAvailability(variantId) → { inStock, quantity }` · `decrementStock(lines, tx?) → Result<void, OutOfStock>`.
+2. **Public interface**: `getProduct(slug) → Product | null` · `getVariant(id) → Variant | null` · `listProducts({ categoryId?, ids?, limit? }) → Product[]` · `listCategories() → Category[]` · `getAvailability(variantId) → { inStock, quantity }` · `decrementStock(lines, tx?) → Result<void, OutOfStock>` · `restoreStock(lines, tx?)` (a cancelled order) · **`findProducts(criteria) → { products, total, page, facets }`** (added in the scale-up: text match, category/brand/price/rating/stock/sale filters, sort and pagination as indexed SQL, with category and brand facet counts; the only place that reads catalogue tables for search). `listProducts()` loads everything and is for tests and tooling only.
 3. **Inputs**: slugs, ids, filters; `{ variantId, quantity }[]` for stock.
 4. **Outputs**: `Product { id, slug, title, brand, description, category, images[], rating, variants[] }`, `Variant { id, attrs, priceCents, listPriceCents?, stock }`.
 5. **Owns**: `Category`, `Product`, `Variant`, `ProductImage`, stock counts, seed data.
@@ -32,7 +32,7 @@ Eight deep modules; no `pricing` and no `product` module (product display is a v
 ## search
 
 1. **Responsibility**: turn a query plus filters into ranked, filtered, sorted, paginated results with facets; parse and serialise the URL form.
-2. **Public interface**: `searchProducts(query: SearchQuery) → SearchResult` · `parseSearchParams(URLSearchParams) → SearchQuery` · `toSearchParams(SearchQuery) → URLSearchParams` · `suggest(text) → Suggestion[]` (P1).
+2. **Public interface**: `searchProducts(query: SearchQuery) → SearchResult` · `parseSearchParams(URLSearchParams) → SearchQuery` · `toSearchParams(SearchQuery) → URLSearchParams` · `suggest(text) → Suggestion[]`. Search owns the policy (filler words, tokens, exact, then close misspellings, then half of the words) and calls `catalog.findProducts` for the data; it no longer loads the catalogue. Brand filter: `b` URL parameter, repeated.
 3. **Inputs**: `SearchQuery { text?, categoryId?, priceRange?, minRating?, sort, page, pageSize }`.
 4. **Outputs**: `SearchResult { items: ProductSummary[], total, page, facets }`.
 5. **Owns**: search index/view if any (none at first: queries catalog tables through `catalog`).
@@ -55,7 +55,7 @@ Eight deep modules; no `pricing` and no `product` module (product display is a v
 ## checkout
 
 1. **Responsibility**: turn a cart into an order: price it (shipping, tax, total), validate stock, take payment, create the order atomically. The only orchestrating module.
-2. **Public interface**: `quoteCart(cart, address?) → Quote` (pure) · `getQuote(actor, { address? }) → Result<Quote, CheckoutError>` · `placeOrder(actor, input, ports) → Result<Order, CheckoutError>`, `input = { address, contactEmail, payment, idempotencyKey }`.
+2. **Public interface**: `quoteCart(cart, address?) → Quote` (pure) · `getQuote(actor, { address? }) → Result<Quote, CheckoutError>` · `placeOrder(actor, input, ports) → Result<Order, CheckoutError>`, `input = { address, contactEmail, payment, idempotencyKey }` · `cancelOrder(actor, orderId) → Result<Order, NOT_FOUND | NOT_CANCELLABLE>` (one transaction: cancel + restore stock).
 3. **Inputs**: `Actor`, `ShippingAddress { name, line1, line2?, city, region, postalCode, country }`, `PaymentInput`, idempotency key. The client never sends prices or totals.
 4. **Outputs**: `Quote { subtotalCents, shippingCents, taxCents, totalCents }`; `Order` (from `orders`); `CheckoutError` ∈ `EMPTY_CART | OUT_OF_STOCK | PAYMENT_DECLINED | INVALID_ADDRESS`.
 5. **Owns**: pricing rules (provisional demo rules: free shipping at or above 3500 cents else 499; tax 8% rounded half up). No tables (idempotency key is stored on the order).
@@ -66,7 +66,7 @@ Eight deep modules; no `pricing` and no `product` module (product display is a v
 ## orders
 
 1. **Responsibility**: what was bought and what happened to it: the purchase-time snapshot, lookup scoped to the owner, status over time, cancellation.
-2. **Public interface**: `createOrder(data, tx?) → Order` (called by `checkout` only) · `getOrder(actor, id) → Order | null` · `listOrders(actor) → Order[]` · `cancelOrder(actor, id) → Result<Order, NotCancellable>` (P1) · `statusAt(order, now) → OrderStatus` (pure).
+2. **Public interface**: `createOrder(data, tx?) → Order` (called by `checkout` only) · `getOrder(actor, id) → Order | null` · `listOrders(actor) → Order[]` · `cancelOrder(actor, id, tx?) → Result<Order, NOT_FOUND | NOT_CANCELLABLE>` (called by `checkout`, which also restores stock) · `claimGuestOrders(guestToken, userId)` · `estimatedDeliveryFrom(date)` (pure). Status is **derived on read** from `placedAt`, `cancelledAt` and the injected `Clock` (placed, shipped, out for delivery, delivered, cancelled); an order carries `status`, `cancellable`, `estimatedDelivery` and `timeline`. Thresholds: `orders/internal/lifecycle.ts` (decision D24).
 3. **Inputs**: snapshot data (items with title, unit price, image; totals; address; contact email; payment reference; idempotency key; placed-at from `Clock`; number from `IdGenerator`), `Actor`.
 4. **Outputs**: `Order { id, number, status, items[], totals, address, placedAt, owner }`.
 5. **Owns**: `Order`, `OrderItem`.
