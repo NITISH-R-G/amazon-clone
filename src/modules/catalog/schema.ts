@@ -2,6 +2,7 @@ import { check, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-
 import { sql } from "drizzle-orm";
 
 export type ProductImage = { url: string; alt: string };
+export type ProductSpec = { label: string; value: string };
 
 export const categories = pgTable("categories", {
   id: text("id").primaryKey(),
@@ -25,6 +26,8 @@ export const products = pgTable("products", {
   featuredRank: integer("featured_rank"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   bullets: jsonb("bullets").$type<string[]>().notNull().default([]),
+  /** Technical details shown as a table on the product page. */
+  specs: jsonb("specs").$type<ProductSpec[]>().notNull().default([]),
   /** Name of the option the variants differ by (e.g. "Color", "Size"); null when single-variant. */
   optionName: text("option_name"),
 });

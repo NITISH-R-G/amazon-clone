@@ -8,6 +8,9 @@ const tones = [
   { P: "#262626", D: "#8c8c8c", L: "#fafafa", bg: "#f5f5f5" },
   { P: "#bcbcbc", D: "#6b6b6b", L: "#fafafa", bg: "#f5f5f5" },
   { P: "#e9e9e9", D: "#9a9a9a", L: "#ffffff", bg: "#f0f0f0" },
+  { P: "#4a4a4a", D: "#a3a3a3", L: "#f5f5f5", bg: "#eeeeee" },
+  { P: "#8f8f8f", D: "#5a5a5a", L: "#fafafa", bg: "#f7f7f7" },
+  { P: "#d4d4d4", D: "#7a7a7a", L: "#ffffff", bg: "#f5f5f5" },
 ];
 
 const rr = (x, y, w, h, r, fill, extra = "") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" ${extra}/>`;
@@ -64,4 +67,18 @@ for (const p of catalog.products) {
   const detail = `<g transform="translate(400 400) scale(1.75) translate(-400 -440)">${main}</g>`;
   writeFileSync(`public/products/${p.slug}-2.svg`, svg(detail, "#ececec", `${p.title}, detail`));
 }
-console.log(`wrote ${catalog.products.length * 2} images`);
+console.log(`wrote ${catalog.products.length * 2} curated images`);
+
+// Shared illustrations for the generated catalogue: /products/<shape>-<tone>-<1|2>.svg.
+// 2,400 products cannot each have their own files; they reference one of these by shape and tone.
+let shared = 0;
+for (const [shape, draw] of Object.entries(shapes)) {
+  tones.forEach((tone, i) => {
+    const main = draw(tone);
+    writeFileSync(`public/products/${shape}-${i}-1.svg`, svg(main, tone.bg, "Product illustration"));
+    const detail = `<g transform="translate(400 400) scale(1.75) translate(-400 -440)">${main}</g>`;
+    writeFileSync(`public/products/${shape}-${i}-2.svg`, svg(detail, "#ececec", "Product illustration, detail"));
+    shared += 2;
+  });
+}
+console.log(`wrote ${shared} shared images`);

@@ -1,7 +1,7 @@
 import type { Cents } from "@/lib/money";
-import type { ProductImage } from "./schema";
+import type { ProductImage, ProductSpec } from "./schema";
 
-export type { ProductImage };
+export type { ProductImage, ProductSpec };
 
 export type Variant = {
   id: string;
@@ -31,6 +31,7 @@ export type Product = {
   featuredRank: number | null;
   createdAt: Date;
   bullets: string[];
+  specs: ProductSpec[];
   optionName: string | null;
 };
 

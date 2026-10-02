@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
@@ -6,6 +7,7 @@ import * as schema from "@/db/schema";
 import { createSystemIds, systemClock } from "@/lib/ports";
 import { createDemoProvider } from "@/modules/payments";
 import { createApp } from "@/server/app";
+import { CATALOG_SIZE } from "./catalog/generate";
 import { seedDemoCatalog } from "./seed-demo";
 
 describe("demo catalogue", () => {
@@ -20,12 +22,15 @@ describe("demo catalogue", () => {
     const app = createApp({ db, clock: systemClock, ids, payments: createDemoProvider({ clock: systemClock, ids }) });
 
     const all = await app.search.searchProducts({ pageSize: 100 });
-    expect(all.total).toBe(30);
+    expect(all.total).toBe(CATALOG_SIZE);
     expect((await app.catalog.listCategories()).length).toBe(6);
-    expect(new Set(all.items.map((i) => i.slug)).size).toBe(30);
 
     const products = await app.catalog.listProducts();
+    expect(new Set(products.map((p) => p.slug)).size).toBe(CATALOG_SIZE);
     for (const p of products) {
+      // Every product page has technical details, and every image is a file we ship.
+      expect(p.specs.length, p.slug).toBeGreaterThanOrEqual(4);
+      for (const image of p.images) expect(existsSync(`public${image.url}`), `${p.slug}: ${image.url}`).toBe(true);
       expect(p.variants.length, p.slug).toBeGreaterThan(0);
       expect(p.images.length, p.slug).toBeGreaterThanOrEqual(1);
       for (const v of p.variants) expect(Number.isInteger(v.priceCents) && v.priceCents > 0, v.id).toBe(true);
