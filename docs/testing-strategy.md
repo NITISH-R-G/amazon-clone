@@ -8,7 +8,7 @@ Tags: **[R]** required, **[Q]** quality, **[O]** optional.
 
 Browser/E2E tests are valuable but expensive feedback loops (slow, flaky, hard to localise). Therefore:
 
-- **Establish business behaviour at the unit/integration seam first.** Cart maths, re-pricing, order state, search parsing and auth rules are tested through module interfaces (`docs/architecture.md` §3), not through the browser.
+- **Establish business behaviour at the unit/integration seam first.** Cart maths, re-pricing, order state, search parsing and auth rules are tested through module interfaces (`docs/modules.md`), not through the browser.
 - **Use E2E for critical user journeys only** (below), not for every state or edge case.
 - **Do not write every browser test before implementation.** No big batch up front. A journey test is written when its underlying behaviour already works.
 - **Verify the UI manually during development** (built-in browser, checklist below), slice by slice.

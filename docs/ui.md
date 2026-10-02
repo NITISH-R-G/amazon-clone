@@ -11,6 +11,10 @@ Read before any UI work. Design context for Impeccable is `PRODUCT.md`; tokens a
 - Consistent spacing (4 px grid), type scale, interaction states (default, hover, focus-visible, active, disabled, loading, error), accessibility and responsive behaviour come from tokens and primitives, not per-component overrides. One focus ring everywhere.
 - Presentational components take plain typed props; no data fetching inside primitives.
 
+## Phase 1 first slice: install only this
+
+The tracer bullet (`docs/tracer-bullet.md`) has four thin pages and needs exactly: `button`, `input`, `label`, `card`, `separator`. Install those when the first page needs them; add every other component only in the slice that uses it. No domain component (`ProductCard`, `ProductGallery`, `PriceBlock`, `RatingStars`, `QuantityStepper`, `VariantPicker`, `ProductRail`) is built before its slice, and none exists today. Domain components are compositions of shadcn primitives; no parallel primitive system.
+
 ## Required shadcn components (validated against the planned UI)
 
 Status of the repo today: no `components.json`, nothing installed. **Already available: none.** "Install" below means `shadcn add <name>` during the slice that first needs it.

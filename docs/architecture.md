@@ -9,7 +9,7 @@ Goal: a codebase that is easy for an AI agent to navigate and easy for a human t
 1. **Deep modules [R]**: each domain exposes a small public interface (`index.ts`) and hides its logic, data access and rules. Vocabulary: see the `codebase-design` skill (module, interface, depth, seam, adapter).
 2. **One entry point per module.** Other code imports only from `modules/<name>` (its `index.ts`), never from its internals. Enforce with an import-restriction lint rule [Q].
 3. **A module owns its tables and its rules.** No other module reads its tables; they call its interface.
-4. **Seams are the module interfaces.** Tests exercise behaviour through them (see `docs/agents/workflow.md`, `docs/testing-strategy.md`). Mock only the external ports in §3.
+4. **Seams are the module interfaces.** Tests exercise behaviour through them (see `docs/agents/workflow.md`, `docs/testing-strategy.md`). Fake only the external ports (`Clock`, `IdGenerator`, `PaymentProvider`; see `docs/modules.md`).
 5. **Server-first.** Server components read through module interfaces; server actions write through them; client components get plain data.
 6. **UI never holds business rules** (pricing, stock, status, authorisation); it renders what modules return.
 
@@ -34,26 +34,11 @@ Unit/integration tests are colocated with the module and import only its `index.
 
 ## 3. Modules and public interfaces
 
-`product` is **folded into `catalog`**: a product page is a view over catalogue data, not a separate domain. Pricing is internal to `cart` (line and subtotal) and `checkout` (quote with shipping/tax); there is no shared "pricing" module.
+**Locked: eight modules** (`catalog`, `search`, `cart`, `checkout`, `orders`, `auth`, `payments`, `account`). Each one's responsibility, interface, inputs/outputs, owned persistence, allowed and forbidden dependencies, and unit/integration/E2E split are in **`docs/modules.md`** (single source; not repeated here). `product` is folded into `catalog`; there is no `pricing` module.
 
-External **ports** (the only things mocked or faked in tests): `Clock`, `IdGenerator` (order numbers, tokens), `PaymentProvider`. Everything else runs for real against a test database.
+Dependency direction (no cycles): `checkout → {cart, orders, payments, catalog}`, `cart → catalog`, `search → catalog`; the rest are leaves. Cross-module orchestration happens in `checkout` or in thin `app/` server actions.
 
-| Module | Purpose | Public interface (shape, not final signatures) | Hides | Depends on |
-|---|---|---|---|---|
-| **catalog** [R] | Products, variants, categories, availability, images | `getProduct(slug)`, `getVariant(id)`, `listCategories()`, `listProducts({ category, ids })`, `getAvailability(variantId)`; types `Product`, `Variant`, `Money` | Schema, joins, price/list-price rules, stock reads, image ordering | none |
-| **search** [R] | Query → ranked, filtered, sorted, paginated results with facets | `searchProducts(query: SearchQuery) → { items, total, facets, page }`, `parseSearchParams(URLSearchParams) → SearchQuery`, `suggest(text)` [Q] | Ranking, full-text or LIKE implementation, facet counting, param validation | catalog |
-| **cart** [R] | Guest and user carts, quantities, totals | `getCart(ctx)`, `addItem(ctx, variantId, qty)`, `setQuantity(ctx, lineId, qty)`, `removeItem(ctx, lineId)`, `restoreItem(ctx, lineId)` (undo), `mergeGuestCart(guestToken, userId)`, `saveForLater` [Q]; `Cart` includes totals and per-line availability | Persistence, stock clamping, max quantity, subtotal math, guest-token handling | catalog |
-| **checkout** [R] | Turn a cart into an order | `getQuote(ctx, { address, shippingMethod })`, `placeOrder(ctx, input) → Result<Order, CheckoutError>` | Server-side re-pricing, stock re-validation, shipping/tax rules, the transaction, idempotency, payment orchestration | cart, orders, payments, account |
-| **orders** [R] | Order history and lifecycle | `listOrders(userId)`, `getOrder(userId, id)`, `cancelOrder(userId, id)` [Q]; `createOrder` is used by `checkout` only; `statusAt(order, now)` | Status machine, time-derived progression, purchase-time snapshot, order numbers | none (reads `Clock`) |
-| **auth** [R] | Identity and sessions | `checkIdentifier(email)`, `register(input)`, `signIn(input)`, `signOut()`, `getSession()`, `requireUser(returnTo)` | Hashing, session storage, cookie flags, rate limiting, generic error policy | none |
-| **payments** [R] | Authorise a payment | `PaymentProvider.authorize({ amount, method }) → Approved | Declined`; demo provider validates card format and declines designated test numbers | Provider choice (demo now, Stripe test later), card validation, brand/last-four extraction | none |
-| **account** [Q; addresses required for checkout] | Addresses and profile | `listAddresses(userId)`, `saveAddress`, `deleteAddress`, `setDefaultAddress`, `getProfile`, `updateProfile` | Validation, default-address rule | auth |
-
-Dependency direction (no cycles): `app → checkout → {cart, orders, payments, account} → catalog`; `app → search → catalog`; `app → auth`. `orders` and `payments` do not import `cart`.
-
-### Seams worth testing first
-
-`cart` (totals, merge, stock clamp), `checkout.placeOrder` (re-pricing, atomicity, idempotency, declined payment), `search.searchProducts` + `parseSearchParams` (URL round-trip, filters), `orders.statusAt`, `auth` (register/sign-in/protection). These carry the business risk; UI components are verified in the browser first.
+First build: `docs/tracer-bullet.md` (the thinnest real slice across `catalog`, `cart`, `checkout`, `orders`, `payments`) and its test contract.
 
 ## 4. Routing [R]
 

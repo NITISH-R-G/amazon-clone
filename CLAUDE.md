@@ -16,7 +16,8 @@ Package manager: `pnpm`. No app is scaffolded yet (Phase 0); standard `pnpm dev|
 
 - Doing any feature work: `docs/agents/workflow.md` (loop, TDD seams, vertical slices)
 - UI work or shadcn components: `docs/ui.md`
-- Module boundaries, data, auth, payments: `docs/architecture.md`
+- Module contracts and dependency rules: `docs/modules.md`; stack, data, auth, payments: `docs/architecture.md`
+- First build and its test contract: `docs/tracer-bullet.md`
 - Tests and browser verification: `docs/testing-strategy.md`
 - Scope and order of work: `docs/roadmap.md`
 - Why we differ from Amazon: `docs/product-decisions.md`
