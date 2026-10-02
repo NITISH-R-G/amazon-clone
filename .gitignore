@@ -15,3 +15,8 @@ test-results/
 *.log
 !.agent-logs/_capture-errors.log
 .impeccable/config.local.json
+
+# next.js env
+next-env.d.ts
+*.tsbuildinfo
+/data/

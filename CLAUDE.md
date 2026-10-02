@@ -10,6 +10,7 @@ Package manager: `pnpm`. No app is scaffolded yet (Phase 0); standard `pnpm dev|
 - `recon/` is read-only reference material containing a real customer's session data. Never modify it, commit it, or copy values from it (see `docs/recon/privacy-notes.md`).
 - Never disable, replace or overwrite the capture hooks in `.claude/settings.json` / `.claude/hooks/capture.js`; merge new hooks alongside them. Never hand-edit `.agent-logs/`.
 - Do not push, create remotes, deploy, or install dependencies without being asked.
+- Next.js here is v16 and differs from older versions: read the relevant guide in `node_modules/next/dist/docs/` before using a Next API (see `AGENTS.md`).
 - Unknown facts about Amazon behaviour are `UNKNOWN / REQUIRES VALIDATION`; never invent them.
 
 ## Where things are (read when relevant)
