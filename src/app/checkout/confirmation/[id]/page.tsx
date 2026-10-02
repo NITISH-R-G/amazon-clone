@@ -1,97 +1,61 @@
 import { CheckCircle2 } from "lucide-react";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { OrderDetail } from "@/components/orders/order-detail";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { formatUsd } from "@/lib/money";
-import { readGuestActor } from "@/server/guest";
 import { getApp } from "@/server/runtime";
+import { readActor, readUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Order placed" };
 
 export default async function ConfirmationPage({ params }: PageProps<"/checkout/confirmation/[id]">) {
   const { id } = await params;
-  const actor = await readGuestActor();
+  const actor = await readActor();
   if (!actor || !z.uuid().safeParse(id).success) notFound();
   const order = await (await getApp()).orders.getOrder(actor, id);
   if (!order) notFound();
+  const user = await readUser();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <Card className="gap-2 p-6">
-        <div className="flex items-center gap-3 text-success">
-          <CheckCircle2 aria-hidden="true" className="size-8" />
-          <h1 className="text-2xl font-bold">Order placed, thank you!</h1>
-        </div>
-        <p>
-          Your order number is <strong data-testid="order-number">{order.number}</strong>. A receipt will be sent to{" "}
-          {order.contactEmail} (demo: no email is actually sent).
+    <div className="mx-auto max-w-5xl space-y-10">
+      <header className="space-y-3">
+        <h1 className="flex items-center gap-3 text-[28px] leading-9 font-semibold tracking-[-0.02em] sm:text-[32px] sm:leading-[38px]">
+          <CheckCircle2 aria-hidden="true" className="size-8 shrink-0 text-success" />
+          Order placed
+        </h1>
+        <p className="text-muted-foreground">
+          Order{" "}
+          <strong className="num font-semibold text-foreground" data-testid="order-number">
+            {order.number}
+          </strong>
+          . A receipt goes to {order.contactEmail} (demo: no email is sent).
         </p>
-      </Card>
+      </header>
 
-      <Card className="gap-4 p-6">
-        <h2 className="text-lg font-bold">Items</h2>
-        <ul className="divide-y">
-          {order.items.map((item) => (
-            <li key={item.variantId} className="flex items-center gap-4 py-3">
-              <div className="relative size-16 shrink-0 overflow-hidden rounded-md bg-muted">
-                {item.imageUrl ? <Image src={item.imageUrl} alt="" fill unoptimized className="object-contain" /> : null}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="line-clamp-2 font-medium">{item.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  Qty {item.quantity} · {formatUsd(item.unitPriceCents)} each
-                </p>
-              </div>
-              <p className="font-medium">{formatUsd(item.unitPriceCents * item.quantity)}</p>
-            </li>
-          ))}
-        </ul>
-        <dl className="space-y-1 border-t pt-3 text-sm">
-          <div className="flex justify-between">
-            <dt>Items</dt>
-            <dd>{formatUsd(order.subtotalCents)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Shipping</dt>
-            <dd>{order.shippingCents === 0 ? "Free" : formatUsd(order.shippingCents)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Tax</dt>
-            <dd>{formatUsd(order.taxCents)}</dd>
-          </div>
-          <div className="flex justify-between border-t pt-2 text-lg font-bold">
-            <dt>Order total</dt>
-            <dd data-testid="order-total">{formatUsd(order.totalCents)}</dd>
-          </div>
-        </dl>
-      </Card>
+      <OrderDetail order={order} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="gap-1 p-6 text-sm">
-          <h2 className="mb-1 text-lg font-bold">Shipping to</h2>
-          <p>{order.address.name}</p>
-          <p>{order.address.line1}</p>
-          {order.address.line2 ? <p>{order.address.line2}</p> : null}
-          <p>
-            {order.address.city}, {order.address.region} {order.address.postalCode}
-          </p>
-        </Card>
-        <Card className="gap-1 p-6 text-sm">
-          <h2 className="mb-1 text-lg font-bold">Payment</h2>
-          <p className="capitalize">
-            {order.payment.brand} ending in {order.payment.last4}
-          </p>
-          <p className="text-muted-foreground">Demo payment: no card was charged.</p>
-        </Card>
+      <div className="flex flex-wrap items-center gap-3 border-t pt-8">
+        {user ? (
+          <Button asChild variant="outline" className="mr-auto">
+            <Link href={`/orders/${order.id}`}>View in your orders</Link>
+          </Button>
+        ) : (
+          <>
+            <div className="mr-auto space-y-1">
+              <p className="text-[15px] font-medium">Keep track of this order</p>
+              <p className="text-sm text-muted-foreground">Create an account and it is saved to your order history.</p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/register?returnTo=/orders">Create account</Link>
+            </Button>
+          </>
+        )}
+        <Button asChild>
+          <Link href="/s">Continue shopping</Link>
+        </Button>
       </div>
-
-      <Button asChild>
-        <Link href="/s">Continue shopping</Link>
-      </Button>
     </div>
   );
 }

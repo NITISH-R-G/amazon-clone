@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSystemIds } from "@/lib/ports";
-import { readGuestActor, ensureGuestActor } from "@/server/guest";
+import { ensureActor, readActor } from "@/server/session";
 import { getApp } from "@/server/runtime";
 import type { FormState } from "./form-state";
 
@@ -28,7 +28,7 @@ export async function addToCartAction(_prev: FormState, formData: FormData): Pro
   const parsed = addSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "Enter a quantity of 1 or more." };
   const app = await getApp();
-  const actor = await ensureGuestActor(newToken);
+  const actor = await ensureActor(newToken);
   const result = await app.cart.addItem(actor, parsed.data.variantId, parsed.data.quantity);
   if (!result.ok) return { error: cartMessages[result.error] ?? "Could not add this item." };
   const clamped = result.value.lines.some((l) => l.clamped);
@@ -41,7 +41,7 @@ export async function quickAddAction(_prev: FormState, formData: FormData): Prom
   const parsed = z.object({ variantId: z.string().min(1) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: "This item is no longer available." };
   const app = await getApp();
-  const actor = await ensureGuestActor(newToken);
+  const actor = await ensureActor(newToken);
   const result = await app.cart.addItem(actor, parsed.data.variantId, 1);
   if (!result.ok) return { error: cartMessages[result.error] ?? "Could not add this item." };
   revalidatePath("/", "layout");
@@ -52,7 +52,7 @@ const lineSchema = z.object({ lineId: z.string().min(1), quantity: z.coerce.numb
 
 export async function updateQuantityAction(formData: FormData): Promise<void> {
   const parsed = lineSchema.safeParse(Object.fromEntries(formData));
-  const actor = await readGuestActor();
+  const actor = await readActor();
   if (!parsed.success || !actor) redirect("/cart");
   const app = await getApp();
   const result = await app.cart.setQuantity(actor, parsed.data.lineId, parsed.data.quantity ?? Number.NaN);
@@ -63,7 +63,7 @@ export async function updateQuantityAction(formData: FormData): Promise<void> {
 
 export async function removeItemAction(formData: FormData): Promise<void> {
   const parsed = lineSchema.safeParse(Object.fromEntries(formData));
-  const actor = await readGuestActor();
+  const actor = await readActor();
   if (!parsed.success || !actor) redirect("/cart");
   const app = await getApp();
   const result = await app.cart.removeItem(actor, parsed.data.lineId);
@@ -73,7 +73,7 @@ export async function removeItemAction(formData: FormData): Promise<void> {
 
 export async function restoreItemAction(formData: FormData): Promise<void> {
   const parsed = lineSchema.safeParse(Object.fromEntries(formData));
-  const actor = await readGuestActor();
+  const actor = await readActor();
   if (!parsed.success || !actor) redirect("/cart");
   const app = await getApp();
   await app.cart.restoreItem(actor, parsed.data.lineId);
@@ -101,7 +101,7 @@ const placeOrderSchema = z.object({
 const checkoutMessages: Record<string, string> = {
   EMPTY_CART: "Your cart is empty.",
   OUT_OF_STOCK: "Sorry, an item in your cart just sold out. Review your cart and try again.",
-  PAYMENT_DECLINED: "Your card was declined. Check the details or try a different card. You have not been charged.",
+  PAYMENT_DECLINED: "Your card was declined. You have not been charged. For your security the card fields were cleared: re-enter them, or use a different card.",
   INVALID_ADDRESS: "Check your shipping address and try again.",
 };
 
@@ -124,7 +124,7 @@ export async function placeOrderAction(_prev: FormState, formData: FormData): Pr
     for (const [key, messages] of Object.entries(flat)) if (messages?.[0]) fieldErrors[key] = messages[0];
     return { error: "Please correct the highlighted fields.", fieldErrors, values };
   }
-  const actor = await readGuestActor();
+  const actor = await readActor();
   if (!actor) return { error: checkoutMessages.EMPTY_CART, values };
 
   const d = parsed.data;

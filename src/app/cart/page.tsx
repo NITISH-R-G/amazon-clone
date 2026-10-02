@@ -11,7 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Separator } from "@/components/ui/separator";
 import { formatUsd } from "@/lib/money";
 import { quoteCart } from "@/modules/checkout";
-import { readGuestActor } from "@/server/guest";
+import { readActor } from "@/server/session";
 import { getApp } from "@/server/runtime";
 
 export const metadata: Metadata = { title: "Cart" };
@@ -26,7 +26,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const sp = await searchParams;
   const one = (key: string) => (typeof sp[key] === "string" ? (sp[key] as string) : undefined);
 
-  const actor = await readGuestActor();
+  const actor = await readActor();
   const app = await getApp();
   const cart = actor ? await app.cart.getCart(actor) : { lines: [], itemCount: 0, subtotalCents: 0 };
 

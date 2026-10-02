@@ -1,18 +1,19 @@
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
-import { readGuestActor } from "@/server/guest";
+import { signOutAction } from "@/app/auth-actions";
+import { readActor, readUser } from "@/server/session";
 import { getApp } from "@/server/runtime";
 import { MobileMenu } from "./mobile-menu";
 import { SearchBar } from "./search-bar";
 
 async function headerData() {
   const app = await getApp();
-  const actor = await readGuestActor();
+  const [actor, user] = await Promise.all([readActor(), readUser()]);
   const [categories, cart] = await Promise.all([
     app.catalog.listCategories(),
     actor ? app.cart.getCart(actor) : Promise.resolve(null),
   ]);
-  return { categories, count: cart?.itemCount ?? 0 };
+  return { categories, count: cart?.itemCount ?? 0, user };
 }
 
 /**
@@ -20,13 +21,13 @@ async function headerData() {
  * Small screens: menu, wordmark and cart on one row, search on its own row, a scrolling category strip below.
  */
 export async function SiteHeader() {
-  const { categories, count } = await headerData();
+  const { categories, count, user } = await headerData();
   const strip = "flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground";
   return (
     <header className="border-b bg-background">
       <div className="mx-auto grid max-w-[1280px] grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:grid-cols-[auto_minmax(0,36rem)_auto] lg:justify-between lg:px-8">
         <div className="flex items-center gap-1">
-          <MobileMenu categories={categories} />
+          <MobileMenu categories={categories} userName={user?.name ?? null} />
           <Link href="/" className="text-xl font-semibold tracking-tight">
             Cartly
           </Link>
@@ -34,6 +35,25 @@ export async function SiteHeader() {
         <div className="order-last col-span-3 lg:order-none lg:col-span-1">
           <SearchBar />
         </div>
+        <div className="flex items-center gap-1">
+        <nav aria-label="Account" className="hidden items-center gap-1 lg:flex">
+          {user ? (
+            <>
+              <Link href="/orders" className={strip}>
+                Orders
+              </Link>
+              <form action={signOutAction}>
+                <button type="submit" className={`${strip} cursor-pointer`}>
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <Link href="/sign-in" className={strip}>
+              Sign in
+            </Link>
+          )}
+        </nav>
         <Link
           href="/cart"
           className="relative flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-medium"
@@ -49,6 +69,7 @@ export async function SiteHeader() {
             , {count} {count === 1 ? "item" : "items"} in cart
           </span>
         </Link>
+        </div>
       </div>
       <nav aria-label="Categories" className="mx-auto max-w-[1280px] px-2 sm:px-4 lg:px-6">
         <ul className="scrollbar-none flex overflow-x-auto">

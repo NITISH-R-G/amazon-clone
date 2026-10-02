@@ -3,13 +3,14 @@
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { signOutAction } from "@/app/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-type Props = { categories: { slug: string; name: string }[] };
+type Props = { categories: { slug: string; name: string }[]; userName: string | null };
 
 /** Navigation sheet for small screens. */
-export function MobileMenu({ categories }: Props) {
+export function MobileMenu({ categories, userName }: Props) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const linkClass = "flex min-h-11 items-center rounded-md px-3 text-base font-medium hover:bg-muted";
@@ -37,6 +38,24 @@ export function MobileMenu({ categories }: Props) {
               {c.name}
             </Link>
           ))}
+        </nav>
+        <nav aria-label="Account" className="flex flex-col border-t p-2">
+          {userName ? (
+            <>
+              <Link href="/orders" onClick={close} className={linkClass}>
+                Your orders
+              </Link>
+              <form action={signOutAction}>
+                <button type="submit" className={`${linkClass} w-full cursor-pointer`}>
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <Link href="/sign-in" onClick={close} className={linkClass}>
+              Sign in
+            </Link>
+          )}
         </nav>
       </SheetContent>
     </Sheet>
