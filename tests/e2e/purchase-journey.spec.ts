@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { generateCatalog } from "../../src/db/catalog/generate";
 
 // Tier-1/2 journeys (docs/testing-strategy.md) through the real app boundary. Both projects
 // (desktop, mobile) share one fresh in-memory database, so each test buys a different product
@@ -33,6 +34,9 @@ async function fillCard(page: Page, number: string) {
 }
 
 const placeOrder = (page: Page) => page.getByRole("button", { name: /Place your order/ }).click();
+
+const cartTotalText = async (page: Page) =>
+  (await page.getByText("Estimated total").locator("xpath=following-sibling::*[1]").innerText()).trim();
 
 const cartTotal = async (page: Page) =>
   (await page.getByText("Estimated total").locator("xpath=following-sibling::*[1]").innerText()).trim();
@@ -123,6 +127,60 @@ test("purchase: a guest buys a product, then creates an account and finds the or
   await expect(page.getByText(orderNumber)).toBeVisible();
   await page.getByRole("link", { name: new RegExp(orderNumber) }).click();
   await expect(page.getByRole("heading", { level: 1, name: orderNumber })).toBeVisible();
+  await expect(page.getByTestId("order-total")).toHaveText(total);
+});
+
+// A rich phone (several colours, storages and RAM sizes, everything in stock) from the deterministic catalogue.
+const phones = generateCatalog().filter(
+  (p) => p.typeSlug === "smartphones" && p.variants.length >= 8 && p.variants.every((v) => v.stock >= 3),
+);
+
+test("variants: choosing colour and storage resolves a real variant that survives cart, checkout and order", async ({ page }, info) => {
+  const phone = pick(info, phones[0], phones[1]);
+  await page.goto(`/dp/${phone.slug}`);
+  await expect(page.getByRole("heading", { level: 1, name: phone.title })).toBeVisible();
+
+  for (const name of ["Color", "Storage", "RAM"]) await expect(page.getByRole("radiogroup", { name })).toBeVisible();
+  const sku = page.getByTestId("sku");
+  const price = page.getByTestId("purchase-price");
+  const firstSku = (await sku.innerText()).trim();
+  const firstPrice = (await price.innerText()).trim();
+
+  // Pick a different storage: a different variant (SKU), and for a phone a different price.
+  const storages = [...new Set(phone.variants.map((v) => v.selections.storage))];
+  const currentStorage = phone.variants.find((v) => v.sku === firstSku.replace("SKU ", ""))?.selections.storage;
+  const otherStorage = storages.find((s) => s !== currentStorage) as string;
+  await page.getByRole("radiogroup", { name: "Storage" }).getByText(otherStorage, { exact: true }).click();
+  await expect(sku).not.toHaveText(firstSku);
+  await expect(price).not.toHaveText(firstPrice);
+  await expect(page).toHaveURL(/sku=CT-SMA-/);
+
+  // Pick a different colour: the picture follows.
+  const image = page.getByRole("img", { name: new RegExp(phone.title) }).first();
+  const imageBefore = await image.getAttribute("src");
+  const colors = [...new Set(phone.variants.map((v) => v.selections.color))];
+  const chosenColor = (await page.getByRole("radiogroup", { name: "Color" }).locator("[data-state=checked]").count()) ? colors[colors.length - 1] : colors[0];
+  await page.getByRole("radiogroup", { name: "Color" }).getByText(chosenColor, { exact: true }).click();
+  await expect(page.getByRole("img", { name: new RegExp(chosenColor) }).first()).toBeVisible();
+  expect(await page.getByRole("img", { name: new RegExp(phone.title) }).first().getAttribute("src")).not.toBe(imageBefore);
+
+  // The resolved variant: read what the page now says it is, then follow it through the funnel.
+  const chosenSku = (await sku.innerText()).replace("SKU ", "").trim();
+  const variant = phone.variants.find((v) => v.sku === chosenSku);
+  expect(variant, `page shows ${chosenSku}`).toBeDefined();
+  const label = variant?.label as string;
+  await page.getByRole("button", { name: "Add to cart" }).click();
+
+  await expect(page).toHaveURL(/\/cart/);
+  await expect(page.getByRole("link", { name: new RegExp(`${phone.title}.*${label.split(", ")[0]}`) }).first()).toBeVisible();
+  const total = await cartTotalText(page);
+  await page.getByRole("link", { name: "Checkout" }).click();
+  await fillShipping(page);
+  await fillCard(page, "4242424242424242");
+  await placeOrder(page);
+
+  await expect(page.getByRole("heading", { name: /Order placed/ })).toBeVisible();
+  await expect(page.getByText(`${phone.title} (${label})`)).toBeVisible();
   await expect(page.getByTestId("order-total")).toHaveText(total);
 });
 

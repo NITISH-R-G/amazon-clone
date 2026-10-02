@@ -17,7 +17,6 @@ import { QuantityStepper } from "./quantity-stepper";
 
 type Props = {
   title: string;
-  optionName: string | null;
   /** Delivery line derived from the checkout shipping rules. */
   shippingNote: string;
   /** ISO time an order placed now is expected to arrive (same timeline as orders). */
@@ -30,9 +29,8 @@ const FORM_ID = "purchase-form";
  * The purchase area: price, availability, variants, quantity and the primary action.
  * On small screens a sticky bar repeats price and action once this panel scrolls out of view.
  */
-export function PurchasePanel({ title, optionName, shippingNote, deliveryEstimate }: Props) {
-  const { variants, selected, select } = usePurchase();
-  const selectedId = selected.id;
+export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) {
+  const { variants, dimensions, states, selected, choose } = usePurchase();
   const [state, action, pending] = useActionState<FormState, FormData>(addToCartAction, {});
   const soldOut = selected.stock < 1;
   const max = Math.min(selected.stock, MAX_PER_SELECTION);
@@ -53,33 +51,54 @@ export function PurchasePanel({ title, optionName, shippingNote, deliveryEstimat
     <>
       <div ref={panelRef} className="space-y-5">
         <PriceBlock cents={selected.priceCents} listCents={selected.listPriceCents} size="lg" className="max-xl:hidden" />
+        <span className="sr-only" data-testid="purchase-price">
+          {formatUsd(selected.priceCents)}
+        </span>
         <AvailabilityMessage state={selected.state} quantity={selected.stock} />
-
-        {variants.length > 1 ? (
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">
-              {optionName ?? "Option"}: <span className="font-normal text-muted-foreground">{selected.label}</span>
-            </legend>
-            <RadioGroup value={selectedId} onValueChange={select} className="flex flex-wrap gap-2" aria-label={optionName ?? "Option"}>
-              {variants.map((v) => (
-                <div key={v.id} className="relative">
-                  <RadioGroupItem value={v.id} id={`variant-${v.id}`} disabled={v.stock < 1} className="peer sr-only" />
-                  <Label
-                    htmlFor={`variant-${v.id}`}
-                    className={cn(
-                      "flex min-h-11 min-w-16 cursor-pointer items-center justify-center rounded-md border border-input px-4 text-sm font-medium transition-colors duration-150",
-                      "peer-data-[state=checked]:border-foreground peer-data-[state=checked]:shadow-[inset_0_0_0_1px_var(--foreground)]",
-                      "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
-                      "peer-disabled:cursor-not-allowed peer-disabled:text-muted-foreground peer-disabled:line-through",
-                    )}
-                  >
-                    {v.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </fieldset>
+        {selected.sku ? (
+          <p data-testid="sku" className="num text-xs text-muted-foreground">
+            SKU {selected.sku}
+          </p>
         ) : null}
+
+        {dimensions.length > 0 && variants.length > 1
+          ? dimensions.map((dimension) => (
+              <fieldset key={dimension.key} className="space-y-2">
+                <legend className="text-sm font-medium">
+                  {dimension.label}: <span className="font-normal text-muted-foreground">{selected.selections[dimension.key]}</span>
+                </legend>
+                <RadioGroup
+                  value={selected.selections[dimension.key]}
+                  onValueChange={(value) => choose(dimension.key, value)}
+                  className="flex flex-wrap gap-2"
+                  aria-label={dimension.label}
+                >
+                  {dimension.values.map((value) => {
+                    const state = states[dimension.key]?.[value];
+                    const id = `opt-${dimension.key}-${value}`;
+                    return (
+                      <div key={value} className="relative">
+                        <RadioGroupItem value={value} id={id} className="peer sr-only" />
+                        <Label
+                          htmlFor={id}
+                          className={cn(
+                            "flex min-h-11 min-w-16 cursor-pointer items-center justify-center rounded-md border border-input px-4 text-sm font-medium transition-colors duration-150",
+                            "peer-data-[state=checked]:border-foreground peer-data-[state=checked]:shadow-[inset_0_0_0_1px_var(--foreground)]",
+                            "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
+                            state && !state.compatible && "text-muted-foreground",
+                            state && !state.inStock && "text-muted-foreground line-through",
+                          )}
+                        >
+                          {value}
+                          {state && !state.inStock ? <span className="sr-only"> (out of stock)</span> : null}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </RadioGroup>
+              </fieldset>
+            ))
+          : null}
 
         <form id={FORM_ID} action={action} className="space-y-4">
           <input type="hidden" name="variantId" value={selected.id} />
