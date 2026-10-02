@@ -19,16 +19,25 @@ Inspected 2026-10-02 (Phase 0). Method: file inventory with content hashing and 
 | [design-tokens.md](design-tokens.md) | Source-derived tokens, implementation tokens, deliberate improvements |
 | [interaction-map.md](interaction-map.md) | Interactive states observed in the DOM/CSS |
 | [amazon-flow-map.md](amazon-flow-map.md) | Core journeys, evidence level per step |
+| [privacy-notes.md](privacy-notes.md) | Sensitive material in `recon/`, protection status, recapture needs |
+| [site-peel-request.md](site-peel-request.md) | Exact captures still needed (P0/P1) |
 
 ## Findings that change the plan
 
-1. **The money pages are missing.** PDP, search results, cart (HTML), checkout, orders and order detail have no captured DOM. Phase 1 cannot be reconstructed faithfully from `recon/` alone. See "Site Peel handoff" in the Phase 0 report and `amazon-flow-map.md`.
-2. **Privacy: `recon/` holds a live customer's identifiers.** The logged-in pages embed a customer ID, CSRF/anti-forgery tokens, session-scoped values, and the Profile Hub URL carries an encoded actor ID. `recon/` is therefore git-ignored and must never be committed or pasted into docs. The customer name and ID are deliberately not repeated in `docs/`. Consider re-capturing from a throwaway account and rotating the session of the captured one.
+1. **The money pages are missing.** PDP, search results, cart (HTML), checkout, orders and order detail have no captured DOM. Phase 1 cannot be reconstructed faithfully from `recon/` alone. See [site-peel-request.md](site-peel-request.md) and `amazon-flow-map.md`.
+2. **Privacy: `recon/` holds a live customer's identifiers.** See [privacy-notes.md](privacy-notes.md). It is git-ignored and must never be committed or pasted into docs.
 3. **Browser-extension contamination.** The saved DOM includes nodes injected by extensions (Chrome Text Blaze, a clipboard extension `cte-*`, a Google Input Tools flag, a "WXT" shadow-root marker, and a "tagfast-profile-marker"). They are noise, not Amazon markup.
 4. **No fonts were captured.** `@font-face` rules reference remote `m.media-amazon.com` WOFF files for **Amazon Ember**, which is proprietary. We need a substitute. See `design-tokens.md`.
 5. **Amazon's logo exists only as a CSS sprite** (`nav-sprite-global-1x…png`, 350×450). It is a trademark asset; shipping it is a legal/brand decision (see `asset-inventory.md`).
 6. **The deals grid and several home cards are client-rendered** and were not fully captured (Today's Deals has only 22 images and a filter-bubble row).
 7. **Everything is a desktop capture.** There is no mobile DOM. Responsive behaviour is inferable only from CSS media queries.
+
+## How to use this source
+
+- Read these docs first; then read targeted parts of `recon/` (ranges, grep), never whole files. The filesystem is the source of truth; do not copy captures into context or docs.
+- Preserve the captures as evidence; extract only what a slice needs and rebuild it in our own components. Do not copy Amazon scripts, tracking, A/B machinery, tokens or proprietary behaviour.
+- Keep reconstruction (what Amazon does) separate from improvement (`docs/product-decisions.md`).
+- New captures arrive in `recon-v2/` per [site-peel-request.md](site-peel-request.md); the same rules apply.
 
 ## Conventions
 

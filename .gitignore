@@ -1,5 +1,6 @@
 # Reference material: 90 MB of Amazon pages/assets with a logged-in session's identifiers. Never commit.
 /recon/
+/recon-v2/
 
 node_modules/
 .next/

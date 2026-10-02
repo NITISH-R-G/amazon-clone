@@ -1,6 +1,6 @@
 # Component inventory
 
-Real component boundaries drawn from the supplied DOM. Not every component listed is built in every phase; build order follows `docs/roadmap.md`. "Evidence" cites where the structure was observed. shadcn/ui is the default; where no good primitive exists the gap is called out (per `CLAUDE.md`: ask before inventing when it materially affects design).
+Real component boundaries drawn from the supplied DOM. Not every component listed is built in every phase; build order follows `docs/roadmap.md`. "Evidence" cites where the structure was observed. shadcn/ui is the default; where no good primitive exists the gap is called out (policy in `docs/ui.md`: ask before inventing when it materially affects design).
 
 ## 1. Global primitives (shadcn/ui)
 

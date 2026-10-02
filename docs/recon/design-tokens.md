@@ -6,7 +6,7 @@ Three layers, kept separate (per the brief):
 2. **Implementation tokens**: what we will define in code (CSS variables mapped into the Tailwind theme / shadcn tokens).
 3. **Deliberate improvements**: where we knowingly depart from Amazon, with reason.
 
-Limitations: no captured mobile DOM; no computed-style dump of rendered pages (static CSS analysis only); Impeccable's analysis engine could not be run in this environment (launcher produced no output), so this extraction is manual. Re-run `/impeccable document` once code exists. Anything not measured is **UNKNOWN / REQUIRES VALIDATION**.
+Limitations: no captured mobile DOM; no computed-style dump of rendered pages (static CSS analysis only); this extraction was done manually from the CSS (the Impeccable engine is installed now but has no built UI to analyse). Run `/impeccable document` once a UI exists to record DESIGN.md from the shipped result. Anything not measured is **UNKNOWN / REQUIRES VALIDATION**.
 
 ## 1. Source-derived tokens
 
