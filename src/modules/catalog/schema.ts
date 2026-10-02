@@ -90,3 +90,31 @@ export const variants = pgTable(
     check("variants_price_non_negative", sql`${t.priceCents} >= 0`),
   ],
 );
+
+/** A marketplace seller (decision D26). First-party "Cartly" is implicit: it is the variant row itself. */
+export const sellers = pgTable("sellers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+});
+
+/** An additional offer on a variant from a seller. The variant's own price and stock are the first-party offer. */
+export const offers = pgTable(
+  "offers",
+  {
+    id: text("id").primaryKey(),
+    variantId: text("variant_id")
+      .notNull()
+      .references(() => variants.id),
+    sellerId: text("seller_id")
+      .notNull()
+      .references(() => sellers.id),
+    priceCents: integer("price_cents").notNull(),
+    listPriceCents: integer("list_price_cents"),
+    shippingCents: integer("shipping_cents").notNull().default(0),
+    /** Minutes before the seller ships; pushes the whole delivery timeline back. */
+    handlingMinutes: integer("handling_minutes").notNull().default(0),
+    fulfilment: text("fulfilment").$type<"cartly" | "seller">().notNull().default("seller"),
+    stock: integer("stock").notNull().default(0),
+  },
+  (t) => [check("offers_stock_non_negative", sql`${t.stock} >= 0`)],
+);

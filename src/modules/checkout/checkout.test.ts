@@ -164,3 +164,49 @@ describe("checkout failure paths", () => {
     expect(read?.items[0]).toMatchObject({ sku: "SKU-MUG-SPK-350", variantLabel: "Speckled, 350 ml" });
   });
 });
+
+describe("checkout with offers", () => {
+  const address = { name: "A B", line1: "1 Test St", city: "Testville", region: "TS", postalCode: "12345", country: "US" };
+  const payment = { number: "4242424242424242", expiry: "12/30", cvc: "123" };
+
+  it("T78: a seller line takes stock from the offer, adds its own shipping, keeps its seller on the order and delays delivery", async () => {
+    let now = new Date("2026-10-03T12:00:00Z").getTime();
+    const app = await createTestApp({ clock: { now: () => new Date(now) } });
+    await app.cart.addItem(g1, "var-kettle", 2, "offer-kettle-nw"); // 2 x 2,699 + 399 shipping, handling 180 min
+
+    const quote = await app.checkout.getQuote(g1);
+    // Only seller lines: no first-party shipping, the seller's own 399. Tax is 8% of the items.
+    expect(quote).toMatchObject({ ok: true, value: { subtotalCents: 5398, shippingCents: 399, taxCents: 432, totalCents: 6229 } });
+
+    const placed = await app.checkout.placeOrder(g1, { address, contactEmail: "a@example.test", payment, idempotencyKey: "k-offer" });
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    expect(placed.value.items[0]).toMatchObject({ variantId: "var-kettle", sellerName: "Northwind Supply", fulfilment: "seller", offerId: "offer-kettle-nw" });
+
+    // Stock came from the offer (3 -> 1); the first-party stock (5) is untouched.
+    expect((await app.catalog.listOffers(["var-kettle"]))["var-kettle"].find((o) => o.offerId === "offer-kettle-nw")?.stock).toBe(1);
+    expect((await app.catalog.getAvailability("var-kettle")).quantity).toBe(5);
+
+    // The seller ships 3 hours late: still Placed (and cancellable) after the usual 5 minutes, shipped at 3 h 5 min.
+    now += 10 * 60_000;
+    const early = await app.orders.getOrder(g1, placed.value.id);
+    expect(early).toMatchObject({ status: "placed", cancellable: true });
+    expect(early?.estimatedDelivery).toEqual(new Date(new Date("2026-10-03T12:00:00Z").getTime() + (120 + 180) * 60_000));
+    now = new Date("2026-10-03T12:00:00Z").getTime() + (180 + 5) * 60_000;
+    expect((await app.orders.getOrder(g1, placed.value.id))?.status).toBe("shipped");
+
+    // Cancelling inside the window returns the offer's stock, not the variant's.
+    now = new Date("2026-10-03T12:00:00Z").getTime() + 60_000;
+    expect((await app.checkout.cancelOrder(g1, placed.value.id)).ok).toBe(true);
+    expect((await app.catalog.listOffers(["var-kettle"]))["var-kettle"].find((o) => o.offerId === "offer-kettle-nw")?.stock).toBe(3);
+    expect((await app.catalog.getAvailability("var-kettle")).quantity).toBe(5);
+  });
+
+  it("T79: a mixed cart keeps the first-party shipping rule for first-party lines and adds seller shipping on top", async () => {
+    const app = await createTestApp();
+    await app.cart.addItem(g1, "var-mug", 1); // first-party 1,200: under the free-shipping threshold -> 499
+    await app.cart.addItem(g1, "var-kettle", 1, "offer-kettle-nw"); // 2,699 + 399
+    const quote = await app.checkout.getQuote(g1);
+    expect(quote).toMatchObject({ ok: true, value: { subtotalCents: 3899, shippingCents: 499 + 399 } });
+  });
+});

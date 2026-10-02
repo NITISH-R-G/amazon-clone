@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Cents } from "@/lib/money";
-import type { AvailabilityState } from "@/modules/catalog";
+import { bestOffer, type OfferView } from "@/modules/catalog/offers";
 import { dimensionsOf, nearestVariant, optionStates, type Dimension, type DimensionDef, type OptionState } from "@/modules/catalog/variants";
 import { PriceBlock } from "./price-block";
 
@@ -16,8 +16,9 @@ export type PurchaseVariant = {
   priceCents: Cents;
   listPriceCents: Cents | null;
   stock: number;
-  state: AvailabilityState;
   images: Image[];
+  /** The first-party offer first, then seller offers. */
+  offers: OfferView[];
 };
 
 type Ctx = {
@@ -25,6 +26,10 @@ type Ctx = {
   dimensions: Dimension[];
   states: Record<string, Record<string, OptionState>>;
   selected: PurchaseVariant;
+  /** The offer that wins the buy box for the selected variant: the price, stock and seller the page shows. */
+  buyBox: OfferView;
+  /** The other offers for the selected variant. */
+  otherOffers: OfferView[];
   /** The shopper picked `value` for dimension `key`: move to the nearest real variant. */
   choose: (key: string, value: string) => void;
   /** Pictures for the selected variant, falling back to the product's. */
@@ -79,13 +84,17 @@ export function PurchaseProvider({ variants, defs, productImages, initialSku, ch
   }, [selected.sku, variants.length]);
 
   const images = selected.images.length > 0 ? selected.images : productImages;
+  const buyBox = useMemo(() => bestOffer(selected.offers), [selected.offers]);
+  const otherOffers = useMemo(() => selected.offers.filter((o) => o !== buyBox), [selected.offers, buyBox]);
   return (
-    <PurchaseContext.Provider value={{ variants, dimensions, states, selected, choose, images }}>{children}</PurchaseContext.Provider>
+    <PurchaseContext.Provider value={{ variants, dimensions, states, selected, buyBox, otherOffers, choose, images }}>
+      {children}
+    </PurchaseContext.Provider>
   );
 }
 
 /** Price for the selected variant (used where the purchase panel is not beside the title). */
 export function LivePrice({ className }: { className?: string }) {
-  const { selected } = usePurchase();
-  return <PriceBlock cents={selected.priceCents} listCents={selected.listPriceCents} size="lg" className={className} />;
+  const { buyBox } = usePurchase();
+  return <PriceBlock cents={buyBox.priceCents} listCents={buyBox.listPriceCents && buyBox.listPriceCents > buyBox.priceCents ? buyBox.listPriceCents : null} size="lg" className={className} />;
 }

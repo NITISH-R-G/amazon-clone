@@ -19,6 +19,10 @@ export type OrderItem = {
   imageUrl: string | null;
   sku: string | null;
   variantLabel: string | null;
+  /** Who sold it ("Cartly" for first-party) and how it was fulfilled. */
+  sellerName: string;
+  fulfilment: "cartly" | "seller";
+  offerId: string | null;
 };
 
 export type OrderStatus = "placed" | "shipped" | "out_for_delivery" | "delivered" | "cancelled";
@@ -38,6 +42,8 @@ export type Order = {
   contactEmail: string;
   payment: { reference: string; brand: string; last4: string };
   placedAt: Date;
+  /** Latest seller handling time among the items, in minutes. */
+  deliveryExtraMinutes: number;
   cancelledAt: Date | null;
   /** Derived from the timestamps and the clock when the order is read (see internal/lifecycle.ts). */
   status: OrderStatus;

@@ -60,6 +60,11 @@ describe("demo catalogue", () => {
     const pictures = new Map((phone?.variants ?? []).map((v) => [v.selections.color, v.images[0].url]));
     expect(new Set(pictures.values()).size).toBe(pictures.size); // each colour has its own picture
 
+    // Marketplace offers: hundreds in total, and the curated headphones have competing sellers.
+    const headphones = await app.catalog.getProduct("studio-headphones");
+    const offerMap = await app.catalog.listOffers((headphones?.variants ?? []).map((v) => v.id));
+    expect(Object.values(offerMap).flat().length).toBeGreaterThan(0);
+
     // Search over the real catalogue: nonsense and very common words must not turn into matches.
     for (const text of ["something-that-does-not-exist", "this is not a product", "qwertyuiop asdfghjkl"]) {
       expect((await app.search.searchProducts({ text })).total, text).toBe(0);

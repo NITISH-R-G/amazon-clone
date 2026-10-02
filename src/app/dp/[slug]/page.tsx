@@ -8,7 +8,6 @@ import { LivePrice, PurchaseProvider } from "@/components/product/purchase-conte
 import { PurchasePanel } from "@/components/product/purchase-panel";
 import { RatingStars } from "@/components/product/rating-stars";
 import { formatUsd } from "@/lib/money";
-import { availabilityState } from "@/modules/catalog";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
 import { estimatedDeliveryFrom } from "@/modules/orders";
 import { getApp } from "@/server/runtime";
@@ -29,6 +28,8 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const category = (await app.catalog.listCategories()).find((c) => c.id === product.categoryId);
   const type = product.typeId ? await app.catalog.getType(product.typeId) : null;
   const defs = (type?.attributes ?? []).filter((a) => a.role === "variation").map((a) => ({ key: a.key, label: a.label, values: a.values }));
+  const offerMap = await app.catalog.listOffers(product.variants.map((v) => v.id));
+  const firstPartyShipping = (priceCents: number) => (priceCents >= FREE_SHIPPING_THRESHOLD_CENTS ? 0 : FLAT_SHIPPING_CENTS);
   const variants = product.variants.map((v) => ({
     id: v.id,
     sku: v.sku,
@@ -38,7 +39,20 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     priceCents: v.priceCents,
     listPriceCents: v.listPriceCents && v.listPriceCents > v.priceCents ? v.listPriceCents : null,
     stock: v.stock,
-    state: availabilityState(v.stock),
+    // The first-party offer is the variant itself; seller offers come after it.
+    offers: [
+      {
+        offerId: null,
+        sellerName: "Cartly",
+        fulfilment: "cartly" as const,
+        priceCents: v.priceCents,
+        listPriceCents: v.listPriceCents && v.listPriceCents > v.priceCents ? v.listPriceCents : null,
+        shippingCents: firstPartyShipping(v.priceCents),
+        handlingMinutes: 0,
+        stock: v.stock,
+      },
+      ...(offerMap[v.id] ?? []),
+    ],
   }));
   // Related: the best-rated products of the same department, without this one.
   const related = category

@@ -10,7 +10,8 @@ export const DELIVERED_AFTER_MS = 120 * MIN;
 export const CANCEL_WINDOW_MS = SHIPPED_AFTER_MS;
 
 /** When an order placed at `from` is expected to arrive (also shown on product pages before buying). */
-export const estimatedDeliveryFrom = (from: Date): Date => new Date(from.getTime() + DELIVERED_AFTER_MS);
+export const estimatedDeliveryFrom = (from: Date, extraMinutes = 0): Date =>
+  new Date(from.getTime() + DELIVERED_AFTER_MS + extraMinutes * MIN);
 
 type Lifecycle = {
   status: OrderStatus;
@@ -19,8 +20,13 @@ type Lifecycle = {
   timeline: TimelineStep[];
 };
 
-export function lifecycleOf(placedAt: Date, cancelledAt: Date | null, now: Date): Lifecycle {
+/**
+ * `extraMinutes` is the seller's handling time: every step after "placed" (and the end of the cancel window)
+ * moves back by that long, because the seller has not shipped yet.
+ */
+export function lifecycleOf(placedAt: Date, cancelledAt: Date | null, now: Date, extraMinutes = 0): Lifecycle {
   const placed = placedAt.getTime();
+  const extra = extraMinutes * MIN;
   const elapsed = now.getTime() - placed;
 
   if (cancelledAt && cancelledAt.getTime() <= now.getTime()) {
@@ -37,16 +43,16 @@ export function lifecycleOf(placedAt: Date, cancelledAt: Date | null, now: Date)
 
   const steps: [Exclude<OrderStatus, "cancelled">, number][] = [
     ["placed", 0],
-    ["shipped", SHIPPED_AFTER_MS],
-    ["out_for_delivery", OUT_FOR_DELIVERY_AFTER_MS],
-    ["delivered", DELIVERED_AFTER_MS],
+    ["shipped", SHIPPED_AFTER_MS + extra],
+    ["out_for_delivery", OUT_FOR_DELIVERY_AFTER_MS + extra],
+    ["delivered", DELIVERED_AFTER_MS + extra],
   ];
   const timeline = steps.map(([status, offset]) => ({ status, at: new Date(placed + offset), reached: elapsed >= offset }));
   const status = [...timeline].reverse().find((s) => s.reached)?.status ?? "placed";
   return {
     status,
-    cancellable: elapsed < CANCEL_WINDOW_MS,
-    estimatedDelivery: estimatedDeliveryFrom(placedAt),
+    cancellable: elapsed < CANCEL_WINDOW_MS + extra,
+    estimatedDelivery: estimatedDeliveryFrom(placedAt, extraMinutes),
     timeline,
   };
 }

@@ -17,10 +17,13 @@ const cartMessages: Record<string, string> = {
   OUT_OF_STOCK: "Sorry, this item is out of stock.",
   VARIANT_NOT_FOUND: "This item is no longer available.",
   LINE_NOT_FOUND: "That item is no longer in your cart.",
+  OFFER_NOT_FOUND: "That seller offer is no longer available.",
 };
 
 const addSchema = z.object({
   variantId: z.string().min(1),
+  /** The seller offer to buy from; empty or missing means the first-party offer. */
+  offerId: z.string().optional(),
   quantity: z.coerce.number(),
 });
 
@@ -29,7 +32,7 @@ export async function addToCartAction(_prev: FormState, formData: FormData): Pro
   if (!parsed.success) return { error: "Enter a quantity of 1 or more." };
   const app = await getApp();
   const actor = await ensureActor(newToken);
-  const result = await app.cart.addItem(actor, parsed.data.variantId, parsed.data.quantity);
+  const result = await app.cart.addItem(actor, parsed.data.variantId, parsed.data.quantity, parsed.data.offerId || null);
   if (!result.ok) return { error: cartMessages[result.error] ?? "Could not add this item." };
   const clamped = result.value.lines.some((l) => l.clamped);
   revalidatePath("/", "layout");

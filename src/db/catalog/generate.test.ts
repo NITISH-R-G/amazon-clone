@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATALOG_SIZE, generateCatalog, TYPE_DEFS } from "./generate";
+import { CATALOG_SIZE, generateCatalog, SELLERS, TYPE_DEFS } from "./generate";
 import curated from "../demo-catalog.json";
 
 describe("generated catalogue", () => {
@@ -118,5 +118,31 @@ describe("generated catalogue", () => {
     const small = phone.variants.filter((v) => v.selections.storage === "128 GB");
     const large = phone.variants.filter((v) => v.selections.storage === "1 TB" || v.selections.storage === "512 GB");
     if (small.length && large.length) expect(Math.min(...large.map((v) => v.price))).toBeGreaterThan(Math.min(...small.map((v) => v.price)));
+  });
+
+  it("T80: a few hundred marketplace offers on a minority of variants, from invented sellers, priced believably", () => {
+    const variants = catalog.flatMap((p) => p.variants);
+    const all = variants.flatMap((v) => v.offers.map((o) => ({ ...o, price: v.price, stock: o.stock })));
+    expect(all.length).toBeGreaterThanOrEqual(350);
+    expect(all.length).toBeLessThanOrEqual(900);
+    expect(variants.filter((v) => v.offers.length > 0).length / variants.length).toBeLessThan(0.15);
+    expect(SELLERS.length).toBeGreaterThanOrEqual(6);
+    for (const o of all) {
+      expect(SELLERS).toContain(o.seller);
+      expect(o.priceCents / o.price, o.seller).toBeGreaterThan(0.85);
+      expect(o.priceCents / o.price, o.seller).toBeLessThan(1.2);
+      expect(o.shippingCents).toBeGreaterThanOrEqual(0);
+      expect(o.handlingMinutes).toBeGreaterThan(0);
+      expect(o.stock).toBeGreaterThanOrEqual(0);
+    }
+    // A mix: some seller offers undercut the first-party price, some are dearer, a few are sold out.
+    expect(all.some((o) => o.priceCents < o.price)).toBe(true);
+    expect(all.some((o) => o.priceCents > o.price)).toBe(true);
+    expect(all.some((o) => o.stock === 0)).toBe(true);
+    // At most two per variant, one per seller.
+    for (const v of variants) {
+      expect(v.offers.length).toBeLessThanOrEqual(2);
+      expect(new Set(v.offers.map((o) => o.seller)).size).toBe(v.offers.length);
+    }
   });
 });

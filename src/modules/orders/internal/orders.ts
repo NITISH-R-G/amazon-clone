@@ -19,7 +19,7 @@ function toOrder(row: OrderRow, items: ItemRow[], now: Date): Order {
     number: row.number,
     items: items
       .filter((i) => i.orderId === row.id)
-      .map(({ variantId, title, unitPriceCents, quantity, imageUrl, sku, variantLabel }) => ({
+      .map(({ variantId, title, unitPriceCents, quantity, imageUrl, sku, variantLabel, sellerName, fulfilment, offerId }) => ({
         variantId,
         title,
         unitPriceCents,
@@ -27,6 +27,9 @@ function toOrder(row: OrderRow, items: ItemRow[], now: Date): Order {
         imageUrl,
         sku,
         variantLabel,
+        sellerName: sellerName ?? "Cartly",
+        fulfilment: fulfilment === "seller" ? ("seller" as const) : ("cartly" as const),
+        offerId,
       })),
     subtotalCents: row.subtotalCents,
     shippingCents: row.shippingCents,
@@ -36,8 +39,9 @@ function toOrder(row: OrderRow, items: ItemRow[], now: Date): Order {
     contactEmail: row.contactEmail,
     payment: { reference: row.paymentReference, brand: row.paymentBrand, last4: row.paymentLast4 },
     placedAt: row.placedAt,
+    deliveryExtraMinutes: row.deliveryExtraMinutes,
     cancelledAt: row.cancelledAt,
-    ...lifecycleOf(row.placedAt, row.cancelledAt, now),
+    ...lifecycleOf(row.placedAt, row.cancelledAt, now, row.deliveryExtraMinutes),
   };
 }
 
@@ -70,6 +74,7 @@ export function createOrders({ db, clock }: OrdersDeps) {
         paymentLast4: data.payment.last4,
         idempotencyKey: data.idempotencyKey,
         placedAt: data.placedAt,
+        deliveryExtraMinutes: data.deliveryExtraMinutes,
       })
       .returning();
     const itemRows = await d
@@ -134,7 +139,7 @@ export function createOrders({ db, clock }: OrdersDeps) {
       .for("update");
     if (!row) return err("NOT_FOUND");
     const now = clock.now();
-    if (!lifecycleOf(row.placedAt, row.cancelledAt, now).cancellable) return err("NOT_CANCELLABLE");
+    if (!lifecycleOf(row.placedAt, row.cancelledAt, now, row.deliveryExtraMinutes).cancellable) return err("NOT_CANCELLABLE");
     const [updated] = await d.update(orders).set({ cancelledAt: now }).where(eq(orders.id, id)).returning();
     const items = await d.select().from(orderItems).where(eq(orderItems.orderId, id));
     return ok(toOrder(updated, items, now));

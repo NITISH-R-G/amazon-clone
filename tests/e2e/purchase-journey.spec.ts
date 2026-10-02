@@ -186,6 +186,38 @@ test("variants: choosing colour and storage resolves a real variant that survive
   await expect(page.getByTestId("order-total")).toHaveText(total);
 });
 
+// A product with a single variant that a marketplace seller also offers (and that is in stock both ways).
+const marketplace = generateCatalog().filter(
+  (p) => p.variants.length === 1 && p.variants[0].stock > 3 && p.variants[0].offers.some((o) => o.stock > 2 && o.fulfilment === "seller"),
+);
+
+test("offers: a variant can be bought from a marketplace seller, and the seller survives to the order", async ({ page }, info) => {
+  const product = pick(info, marketplace[0], marketplace[1]);
+  const offer = product.variants[0].offers.find((o) => o.stock > 2 && o.fulfilment === "seller");
+  const seller = offer?.seller as string;
+  await page.goto(`/dp/${product.slug}`);
+  await expect(page.getByRole("heading", { level: 1, name: product.title })).toBeVisible();
+  await expect(page.getByTestId("seller")).toContainText("Sold by");
+
+  // Either this seller already holds the buy box, or it is listed under "Other sellers".
+  const winner = await page.getByTestId("seller").innerText();
+  if (winner.includes(seller)) {
+    await page.getByRole("button", { name: "Add to cart", exact: true }).click();
+  } else {
+    await page.getByText(/^Other sellers/).click();
+    await page.getByRole("button", { name: `Add to cart from ${seller}` }).click();
+  }
+  await expect(page).toHaveURL(/\/cart/);
+  await expect(page.getByText(`Sold by ${seller}`)).toBeVisible();
+
+  await page.getByRole("link", { name: "Checkout" }).click();
+  await fillShipping(page);
+  await fillCard(page, "4242424242424242");
+  await placeOrder(page);
+  await expect(page.getByRole("heading", { name: /Order placed/ })).toBeVisible();
+  await expect(page.getByText(`Sold by ${seller}`)).toBeVisible();
+});
+
 test("structured search: a department leads to a product type whose own attributes narrow the results", async ({ page }, info) => {
   test.skip(isMobile(info), "the desktop sidebar is exercised here; the mobile sheet shares the same controls");
   await page.goto("/s?c=electronics");

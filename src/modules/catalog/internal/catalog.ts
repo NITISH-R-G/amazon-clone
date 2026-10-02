@@ -1,15 +1,10 @@
-import { and, asc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import { err, ok, type Result } from "@/lib/result";
-import { attributeDefs, categories, productTypes, products, variants } from "../schema";
-import type { AttributeDef, AvailabilityState, Category, Product, ProductType, VariantDetail } from "../types";
+import { attributeDefs, categories, offers, productTypes, products, sellers, variants } from "../schema";
+import type { OfferView } from "../offers";
+import type { AttributeDef, Category, Product, ProductType, VariantDetail } from "../types";
 import { createFind } from "./find";
-
-/** Out of stock at 0, low stock from 1 to 5, otherwise in stock. */
-export function availabilityState(stock: number): AvailabilityState {
-  if (stock <= 0) return "out_of_stock";
-  return stock <= 5 ? "low_stock" : "in_stock";
-}
 
 type ProductRow = typeof products.$inferSelect;
 
@@ -115,30 +110,85 @@ export function createCatalog({ db }: CatalogDeps) {
       return { inStock: quantity > 0, quantity };
     },
 
-    /** Puts units back (a cancelled order). Pass the caller's `tx` to join its transaction. */
-    async restoreStock(lines: { variantId: string; quantity: number }[], tx?: DbOrTx): Promise<void> {
+    /** Seller offers for these variants (the first-party offer is the variant itself), cheapest landed price first. */
+    async listOffers(variantIds: string[], tx?: DbOrTx): Promise<Record<string, (OfferView & { offerId: string })[]>> {
       const d = tx ?? db;
-      for (const { variantId, quantity } of lines) {
-        await d
-          .update(variants)
-          .set({ stock: sql`${variants.stock} + ${quantity}` })
-          .where(eq(variants.id, variantId));
+      const out: Record<string, (OfferView & { offerId: string })[]> = {};
+      if (variantIds.length === 0) return out;
+      const rows = await d
+        .select({ offer: offers, sellerName: sellers.name })
+        .from(offers)
+        .innerJoin(sellers, eq(offers.sellerId, sellers.id))
+        .where(inArray(offers.variantId, variantIds));
+      for (const { offer, sellerName } of rows) {
+        (out[offer.variantId] ||= []).push({
+          offerId: offer.id,
+          sellerName,
+          fulfilment: offer.fulfilment,
+          priceCents: offer.priceCents,
+          listPriceCents: offer.listPriceCents,
+          shippingCents: offer.shippingCents,
+          handlingMinutes: offer.handlingMinutes,
+          stock: offer.stock,
+        });
+      }
+      for (const list of Object.values(out)) list.sort((a, b) => a.priceCents + a.shippingCents - (b.priceCents + b.shippingCents));
+      return out;
+    },
+
+    /** One seller offer with the variant it belongs to, or null. */
+    async getOffer(id: string, tx?: DbOrTx): Promise<(OfferView & { offerId: string; variantId: string }) | null> {
+      const d = tx ?? db;
+      const [row] = await d
+        .select({ offer: offers, sellerName: sellers.name })
+        .from(offers)
+        .innerJoin(sellers, eq(offers.sellerId, sellers.id))
+        .where(eq(offers.id, id))
+        .limit(1);
+      if (!row) return null;
+      const { offer, sellerName } = row;
+      return {
+        offerId: offer.id,
+        variantId: offer.variantId,
+        sellerName,
+        fulfilment: offer.fulfilment,
+        priceCents: offer.priceCents,
+        listPriceCents: offer.listPriceCents,
+        shippingCents: offer.shippingCents,
+        handlingMinutes: offer.handlingMinutes,
+        stock: offer.stock,
+      };
+    },
+
+    /** Puts units back (a cancelled order). Pass the caller's `tx` to join its transaction. */
+    async restoreStock(lines: { variantId: string; quantity: number; offerId?: string | null }[], tx?: DbOrTx): Promise<void> {
+      const d = tx ?? db;
+      for (const { variantId, quantity, offerId } of lines) {
+        if (offerId) await d.update(offers).set({ stock: sql`${offers.stock} + ${quantity}` }).where(eq(offers.id, offerId));
+        else await d.update(variants).set({ stock: sql`${variants.stock} + ${quantity}` }).where(eq(variants.id, variantId));
       }
     },
 
     /** All-or-nothing across lines. Pass the caller's `tx` to join its transaction. */
     async decrementStock(
-      lines: { variantId: string; quantity: number }[],
+      lines: { variantId: string; quantity: number; offerId?: string | null }[],
       tx?: DbOrTx,
     ): Promise<Result<void, { variantId: string }>> {
       try {
         await (tx ?? db).transaction(async (t) => {
-          for (const { variantId, quantity } of lines) {
-            const updated = await t
-              .update(variants)
-              .set({ stock: sql`${variants.stock} - ${quantity}` })
-              .where(and(eq(variants.id, variantId), gte(variants.stock, quantity)))
-              .returning({ id: variants.id });
+          for (const { variantId, quantity, offerId } of lines) {
+            // A seller offer has its own stock; first-party lines take it from the variant.
+            const updated = offerId
+              ? await t
+                  .update(offers)
+                  .set({ stock: sql`${offers.stock} - ${quantity}` })
+                  .where(and(eq(offers.id, offerId), gte(offers.stock, quantity)))
+                  .returning({ id: offers.id })
+              : await t
+                  .update(variants)
+                  .set({ stock: sql`${variants.stock} - ${quantity}` })
+                  .where(and(eq(variants.id, variantId), gte(variants.stock, quantity)))
+                  .returning({ id: variants.id });
             if (updated.length === 0) throw new OutOfStockSignal(variantId);
           }
         });

@@ -1,9 +1,13 @@
 import { count } from "drizzle-orm";
-import { attributeDefs, categories, productTypes, products, variants } from "@/db/schema";
+import { attributeDefs, categories, offers, productTypes, products, sellers, variants } from "@/db/schema";
 import type { Database } from "@/server/app";
 import {
   CATALOG_SIZE,
   EXTRA_CATEGORIES,
+  SELLERS,
+  mulberry32,
+  offersFor,
+  type SeedOffer,
   TYPE_DEFS,
   curatedFacts,
   curatedVariantTones,
@@ -21,9 +25,29 @@ import catalog from "./demo-catalog.json";
  */
 type Row = typeof products.$inferInsert;
 type VariantRow = typeof variants.$inferInsert;
+type OfferRow = typeof offers.$inferInsert;
 type Image = { url: string; alt: string };
 
 const BATCH = 200;
+
+const sellerId = (name: string) => `seller-${slugify(name)}`;
+
+function offerRows(variantId: string, list: SeedOffer[]): OfferRow[] {
+  return list.map((o, i) => ({
+    id: `offer-${variantId}-${i + 1}`,
+    variantId,
+    sellerId: sellerId(o.seller),
+    priceCents: o.priceCents,
+    listPriceCents: o.listPriceCents,
+    shippingCents: o.shippingCents,
+    handlingMinutes: o.handlingMinutes,
+    fulfilment: o.fulfilment,
+    stock: o.stock,
+  }));
+}
+
+// Curated products that show off competing sellers on the home rails and in the demo walkthrough.
+const CURATED_WITH_OFFERS = new Set(["studio-headphones", "linden-ceramic-pour-over-set", "ember-stoneware-mug-2-pack", "everyday-backpack", "field-watch"]);
 
 const pictures = (shape: string, tone: number, alt: string): Image[] => [
   { url: `/products/${shape}-${tone}-1.svg`, alt },
@@ -82,7 +106,9 @@ function curatedProduct(p: (typeof catalog.products)[number], categoryId: Map<st
           stock: p.stock,
         },
       ];
-  return { product, variants: rows };
+  const rng = mulberry32(4242);
+  const extra = CURATED_WITH_OFFERS.has(p.slug) ? rows.flatMap((v) => offerRows(v.id as string, offersFor(rng, v.priceCents))) : [];
+  return { product, variants: rows, offers: extra };
 }
 
 function generatedProduct(p: SeedProduct, categoryId: Map<string, string>) {
@@ -118,7 +144,8 @@ function generatedProduct(p: SeedProduct, categoryId: Map<string, string>) {
     listPriceCents: v.list,
     stock: v.stock,
   }));
-  return { product, variants: rows };
+  const extra = p.variants.flatMap((v) => offerRows(v.id, v.offers));
+  return { product, variants: rows, offers: extra };
 }
 
 export async function seedDemoCatalog(db: Database) {
@@ -159,10 +186,13 @@ export async function seedDemoCatalog(db: Database) {
         })),
       ),
     );
+    await tx.insert(sellers).values(SELLERS.map((name) => ({ id: sellerId(name), name })));
     for (let i = 0; i < built.length; i += BATCH) {
       const slice = built.slice(i, i + BATCH);
       await tx.insert(products).values(slice.map((b) => b.product));
       await tx.insert(variants).values(slice.flatMap((b) => b.variants));
+      const extra = slice.flatMap((b) => b.offers);
+      if (extra.length > 0) await tx.insert(offers).values(extra);
     }
   });
 }

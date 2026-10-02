@@ -19,6 +19,8 @@ export const orders = pgTable(
     paymentLast4: text("payment_last4").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     placedAt: timestamp("placed_at", { withTimezone: true }).notNull(),
+    /** Latest seller handling time on the order (minutes): delays every step after "placed". */
+    deliveryExtraMinutes: integer("delivery_extra_minutes").notNull().default(0),
     /** The only stored lifecycle fact; every other status is derived from `placedAt` and the clock. */
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
@@ -38,4 +40,7 @@ export const orderItems = pgTable("order_items", {
   /** Purchase-time snapshot of the variant that was bought. */
   sku: text("sku"),
   variantLabel: text("variant_label"),
+  sellerName: text("seller_name"),
+  fulfilment: text("fulfilment"),
+  offerId: text("offer_id"),
 });

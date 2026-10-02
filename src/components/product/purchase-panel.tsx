@@ -10,7 +10,9 @@ import { MAX_PER_SELECTION } from "@/lib/limits";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { LocalTime } from "@/components/orders/local-time";
+import { availabilityState } from "@/modules/catalog/offers";
 import { AvailabilityMessage } from "./availability-message";
+import { OtherSellers } from "./other-sellers";
 import { PriceBlock } from "./price-block";
 import { usePurchase } from "./purchase-context";
 import { QuantityStepper } from "./quantity-stepper";
@@ -30,10 +32,12 @@ const FORM_ID = "purchase-form";
  * On small screens a sticky bar repeats price and action once this panel scrolls out of view.
  */
 export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) {
-  const { variants, dimensions, states, selected, choose } = usePurchase();
+  const { variants, dimensions, states, selected, buyBox, otherOffers, choose } = usePurchase();
   const [state, action, pending] = useActionState<FormState, FormData>(addToCartAction, {});
-  const soldOut = selected.stock < 1;
-  const max = Math.min(selected.stock, MAX_PER_SELECTION);
+  const soldOut = buyBox.stock < 1;
+  const max = Math.min(buyBox.stock, MAX_PER_SELECTION);
+  // The seller's handling time pushes the delivery estimate back.
+  const estimate = new Date(new Date(deliveryEstimate).getTime() + buyBox.handlingMinutes * 60_000).toISOString();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [barVisible, setBarVisible] = useState(false);
@@ -50,11 +54,21 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
   return (
     <>
       <div ref={panelRef} className="space-y-5">
-        <PriceBlock cents={selected.priceCents} listCents={selected.listPriceCents} size="lg" className="max-xl:hidden" />
+        <PriceBlock
+          cents={buyBox.priceCents}
+          listCents={buyBox.listPriceCents && buyBox.listPriceCents > buyBox.priceCents ? buyBox.listPriceCents : null}
+          size="lg"
+          className="max-xl:hidden"
+        />
         <span className="sr-only" data-testid="purchase-price">
-          {formatUsd(selected.priceCents)}
+          {formatUsd(buyBox.priceCents)}
         </span>
-        <AvailabilityMessage state={selected.state} quantity={selected.stock} />
+        <AvailabilityMessage state={availabilityState(buyBox.stock)} quantity={buyBox.stock} />
+        <p data-testid="seller" className="text-sm text-muted-foreground">
+          Sold by <span className="font-medium text-foreground">{buyBox.sellerName}</span>
+          {" · "}
+          Fulfilled by {buyBox.fulfilment === "cartly" ? "Cartly" : buyBox.sellerName}
+        </p>
         {selected.sku ? (
           <p data-testid="sku" className="num text-xs text-muted-foreground">
             SKU {selected.sku}
@@ -102,6 +116,7 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
 
         <form id={FORM_ID} action={action} className="space-y-4">
           <input type="hidden" name="variantId" value={selected.id} />
+          <input type="hidden" name="offerId" value={buyBox.offerId ?? ""} />
           {!soldOut ? (
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium" aria-hidden="true">
@@ -122,13 +137,14 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
         {soldOut ? null : (
           <p className="text-sm">
             <span className="font-medium">Get it by </span>
-            <LocalTime iso={deliveryEstimate} />
+            <LocalTime iso={estimate} />
             <span className="text-muted-foreground"> if you order now (demo delivery timeline)</span>
           </p>
         )}
         <p id="purchase-note" className="text-sm text-muted-foreground">
           {shippingNote}
         </p>
+        <OtherSellers variantId={selected.id} offers={otherOffers} deliveryBase={deliveryEstimate} />
       </div>
 
       {/* Sticky purchase bar (small screens only): appears when the panel has scrolled above the viewport. */}
@@ -141,7 +157,7 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
       >
         <div className="mx-auto flex max-w-6xl items-center gap-4">
           <div className="min-w-0 flex-1">
-            <p className="num text-base font-semibold">{formatUsd(selected.priceCents)}</p>
+            <p className="num text-base font-semibold">{formatUsd(buyBox.priceCents)}</p>
             <p className="truncate text-xs text-muted-foreground">{title}</p>
           </div>
           <Button type="submit" form={FORM_ID} size="lg" disabled={pending || soldOut} tabIndex={barVisible ? 0 : -1}>

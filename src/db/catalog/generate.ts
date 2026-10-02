@@ -11,6 +11,29 @@ export type { TypeDef, AttrDef };
 
 export type Selections = Record<string, string>;
 
+/** Invented marketplace sellers (decision D26). First-party "Cartly" is implicit. */
+export const SELLERS = [
+  "Northwind Supply",
+  "Birchwood Direct",
+  "Pinecrest Trading",
+  "Harbor & Vale",
+  "Copperfield Goods",
+  "Meadowlark Wares",
+  "Ironbridge Outlet",
+  "Lanternfish Co",
+];
+
+export type SeedOffer = {
+  seller: string;
+  priceCents: number;
+  listPriceCents: number | null;
+  shippingCents: number;
+  /** Minutes before the seller ships. */
+  handlingMinutes: number;
+  stock: number;
+  fulfilment: "cartly" | "seller";
+};
+
 export type SeedVariant = {
   id: string;
   sku: string;
@@ -22,6 +45,8 @@ export type SeedVariant = {
   stock: number;
   /** Illustration tone (the picture) for this variant: colours differ, other dimensions share the product's. */
   tone: number;
+  /** Additional marketplace offers (the variant's own price and stock are the first-party offer). */
+  offers: SeedOffer[];
 };
 
 export type SeedProduct = {
@@ -186,6 +211,27 @@ export function curatedVariantTones(variants: { label: string }[], key: string, 
   return variants.map((v) => tones.get(v.label) ?? productTone);
 }
 
+// ---------------------------------------------------------------- offers
+
+/** One to two seller offers for a variant priced at `priceCents`: some cheaper, some dearer, a few sold out. */
+export function offersFor(rng: () => number, priceCents: number, max = 2): SeedOffer[] {
+  const count = 1 + (max > 1 && rng() < 0.4 ? 1 : 0);
+  const sellers = [...SELLERS].sort(() => rng() - 0.5).slice(0, count);
+  return sellers.map((seller) => {
+    const price = Math.max(500, Math.round((priceCents * (0.88 + rng() * 0.26)) / 100) * 100 - 1);
+    const cartlyFulfilled = rng() < 0.2;
+    return {
+      seller,
+      priceCents: price,
+      listPriceCents: rng() < 0.25 ? Math.ceil((price * 1.2) / 100) * 100 - 1 : null,
+      shippingCents: cartlyFulfilled ? 0 : [0, 399, 499, 699][Math.floor(rng() * 4)],
+      handlingMinutes: cartlyFulfilled ? 15 : [60, 180, 720][Math.floor(rng() * 3)],
+      stock: rng() < 0.15 ? 0 : 1 + Math.floor(rng() * 40),
+      fulfilment: cartlyFulfilled ? "cartly" : "seller",
+    };
+  });
+}
+
 // ---------------------------------------------------------------- generator
 
 export function generateCatalog(): SeedProduct[] {
@@ -211,6 +257,8 @@ export function generateCatalog(): SeedProduct[] {
   for (const type of TYPE_DEFS.filter((t) => t.slug in RICH_QUOTA)) for (let i = 0; i < RICH_QUOTA[type.slug]; i++) plan.push(type);
   for (let i = 0; i < target - richCount; i++) plan.push(legacy[i % legacy.length]);
 
+  // Offers use their own generator so the catalogue itself is the same with or without them.
+  const offerRng = mulberry32(777);
   const out: SeedProduct[] = [];
   for (const [index, type] of plan.entries()) {
     let brand = "";
@@ -280,6 +328,7 @@ export function generateCatalog(): SeedProduct[] {
         list,
         stock: stockFor(),
         tone: selections.color ? (tones.get(selections.color) as number) : productTone,
+        offers: offerRng() < 0.05 ? offersFor(offerRng, price) : [],
       };
     });
 

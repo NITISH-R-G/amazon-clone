@@ -103,6 +103,10 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                   <Link href={`/dp/${line.productSlug}`} className="relative line-clamp-2 text-[15px] leading-5 font-medium before:absolute before:inset-x-0 before:-inset-y-3 before:content-[''] hover:underline">
                     {line.title}
                   </Link>
+                  <p className="text-xs text-muted-foreground">
+                    Sold by {line.sellerName}
+                    {line.fulfilment === "seller" ? ` · ships from the seller${line.shippingCents > 0 ? `, $${(line.shippingCents / 100).toFixed(2)} shipping` : ", free shipping"}` : " · fulfilled by Cartly"}
+                  </p>
                   {line.sku ? <p className="num text-xs text-muted-foreground">SKU {line.sku}</p> : null}
                   <PriceBlock cents={line.unitPriceCents} listCents={line.listPriceCents} size="sm" />
                   {!line.available ? (

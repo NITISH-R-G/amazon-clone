@@ -1,5 +1,5 @@
 // Public interface of the catalog module. Import only from here.
-export { availabilityState, createCatalog } from "./internal/catalog";
+export { createCatalog } from "./internal/catalog";
 export type { Catalog, CatalogDeps } from "./internal/catalog";
 export type {
   AvailabilityState,
@@ -21,3 +21,4 @@ export type {
   VariantDetail,
 } from "./types";
 export * from "./variants";
+export * from "./offers";

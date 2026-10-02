@@ -24,6 +24,7 @@ export function OrderDetail({ order }: { order: Order }) {
                 <p className="num mt-1 text-sm text-muted-foreground">
                   Qty {item.quantity} · {formatUsd(item.unitPriceCents)} each
                 </p>
+                <p className="text-xs text-muted-foreground">Sold by {item.sellerName}</p>
                 {item.sku ? <p className="num text-xs text-muted-foreground">SKU {item.sku}</p> : null}
               </div>
               <p className="num text-base font-semibold">{formatUsd(item.unitPriceCents * item.quantity)}</p>

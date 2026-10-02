@@ -3,6 +3,14 @@ import type { Cents } from "@/lib/money";
 export type CartLine = {
   id: string;
   variantId: string;
+  /** The seller offer this line was added from; null for the first-party offer. */
+  offerId: string | null;
+  sellerName: string;
+  fulfilment: "cartly" | "seller";
+  /** Shipping this seller charges for the line (first-party shipping is priced on the whole cart). */
+  shippingCents: Cents;
+  /** Minutes the seller takes to ship; delays the order's delivery timeline. */
+  handlingMinutes: number;
   /** Stock-keeping unit and the options chosen ("Black, 256 GB, 8 GB"): the identity of what was selected. */
   sku: string | null;
   variantLabel: string | null;
@@ -26,4 +34,4 @@ export type Cart = {
   subtotalCents: Cents;
 };
 
-export type CartError = "VARIANT_NOT_FOUND" | "LINE_NOT_FOUND" | "INVALID_QUANTITY" | "OUT_OF_STOCK";
+export type CartError = "VARIANT_NOT_FOUND" | "OFFER_NOT_FOUND" | "LINE_NOT_FOUND" | "INVALID_QUANTITY" | "OUT_OF_STOCK";

@@ -60,7 +60,7 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
         const quote = quoteCart(current);
 
         const stock = await catalog.decrementStock(
-          current.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
+          current.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, offerId: l.offerId })),
           tx,
         );
         if (!stock.ok) throw new Abort("OUT_OF_STOCK");
@@ -85,12 +85,16 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
               imageUrl: l.imageUrl,
               sku: l.sku,
               variantLabel: l.variantLabel,
+              sellerName: l.sellerName,
+              fulfilment: l.fulfilment,
+              offerId: l.offerId,
             })),
             ...quote,
             address: input.address,
             contactEmail: input.contactEmail,
             payment: { reference: payment.reference, brand: payment.brand, last4: payment.last4 },
             placedAt: clock.now(),
+            deliveryExtraMinutes: Math.max(0, ...current.lines.map((l) => l.handlingMinutes)),
           },
           tx,
         );
@@ -110,7 +114,7 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
       const cancelled = await orders.cancelOrder(actor, orderId, tx);
       if (cancelled.ok) {
         await catalog.restoreStock(
-          cancelled.value.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          cancelled.value.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, offerId: i.offerId })),
           tx,
         );
       }
