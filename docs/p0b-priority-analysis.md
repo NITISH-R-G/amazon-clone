@@ -102,13 +102,44 @@ Not built in this phase: reviews and review submission, wishlists/save for later
                           LOW USER VALUE
 ```
 
-## Verification log (to be extended with evidence as work lands)
+## Outcome (after implementation)
 
-| Viewport | Route | Action | Expected | Observed |
-|---|---|---|---|---|
-| 1440, 390 | `/dp/*` → `/cart` | Add to cart | Cart with line and totals | As expected |
-| 1440, 390 | `/checkout` | Empty submit | Field errors, summary unchanged | Field errors shown |
-| 1440, 390 | `/checkout` | Decline card `4000...0002` | Error banner, address kept, no order | As expected; card fields cleared |
-| 1440, 390 | `/checkout` | Valid card | Redirect to confirmation | As expected |
-| 1440, 390 | `/orders`, `/sign-in`, `/account` | GET | Pages | **404** (gap) |
-| 1440, 390 | cart, checkout, confirmation | Overflow check | none | none; no console errors |
+| Gap | Result |
+|---|---|
+| Auth, session, sign-out | Done: `auth` module (T36-T40), `/sign-in`, `/register`, header links, `returnTo` validated (T44). |
+| Cart merge, guest-order claim | Done: `cart.mergeGuestCart` (T41-T42), `orders.claimGuestOrders` (T43), orchestrated in `auth-actions.ts`. |
+| Orders list/detail | Done: `/orders`, `/orders/[id]`, shared `OrderDetail`; confirmation links to it or invites a guest to create an account. |
+| Search brittleness | Done (T45-T47): filler words, 1-letter typos, relaxed matches with notice, recovery links on zero results. E2E found that "some words" matched on stray words, so the relaxed fallback needs at least half of the words. |
+| Checkout/confirmation to D20, mobile total, decline retry | Done: hairline sections, collapsible summary with the total on top for small screens, prefill when signed in, "no account needed" prompt, clearer decline message (card fields are cleared deliberately). |
+| A11y and responsive audit | Done: see below. Fixes: 320px overflow on results, touch target sizes, unnamed duplicate cart image link, heading skip on results, dead filter sidebar on zero results, cart list stretched to summary height. |
+| Production database / hosting | **Open, needs a user decision.** PGlite is in-process: on serverless it would not persist or share state between instances. Options: (a) one long-lived Node host with a persistent volume (Fly/Railway/Render) keeping PGlite, or (b) managed Postgres (Neon) with `drizzle-orm/neon-http` or `node-postgres` behind the existing `Database` type. Nothing else in the code needs to change for either. |
+| Address book, order status, delivery estimate | Not built (strategic/defer, per quadrant). |
+
+## Verification log
+
+Chromium (installed Chrome via Playwright), production build, in-memory database. Widths 320, 375, 390, 430, 768, 1024, 1440 for every route below (screenshots taken at each width; those at 1440 and 390 plus 320 results were looked at).
+
+| Route | Checked at every width | Result |
+|---|---|---|
+| `/`, `/s?k=headphones`, empty search, `/dp/everyday-backpack`, `/cart`, `/checkout` (empty submit and declined card), `/checkout/confirmation/*`, `/sign-in`, `/orders`, `/orders/*`, empty cart | horizontal overflow, console errors, exactly one h1, heading skips, text contrast (computed against the effective background), accessible names, target sizes, focus ring on the first 12 Tab stops | No overflow, no console errors, no contrast failures, no missing focus rings, one h1 everywhere. The remaining flags are checker artefacts: a decorative aria-hidden image link, 43.99px rounding on the cart link, and Chrome reporting a fine pointer after Playwright mouse events. |
+| Mobile menu (390) | open with keyboard, Tab 12 times, Escape | Focus stays in the dialog; Escape closes; focus returns to "Open menu". |
+| Filter sheet (390) | open, pick price and stock, apply, browser Back | Count on the apply button updates (5 then 1 product); chips show applied filters; Back restores the previous URL state. |
+| Search box (1440) | type "head", ArrowDown, Enter; type "zzzz" | Combobox with options; Enter opens the product; no options shown for no match. |
+| E2E | 5 journeys on desktop and Pixel 7 | discovery (typo, no result, out of stock), guest purchase then claim, decline then retry, cart survives registration then orders then sign-out, no overflow. 10/10 pass. |
+
+Not done: screen-reader testing (no AT available here), live-server overlay of the Impeccable detector, real-device touch. Contrast numbers come from computed styles, not a tool such as axe.
+
+## Impeccable (inline, degraded: no sub-agent run was authorised for this task)
+
+| Finding | Evidence | Decision | Action |
+|---|---|---|---|
+| Detector (`impeccable detect --json src`) | `[]` | No findings | None |
+| Zero-result page keeps a filter sidebar with nothing to narrow | Screenshot of empty search at 1440 | Accept | Sidebar and mobile Filters button hidden when nothing is found and nothing is applied |
+| Cart list stretches to the summary's height, leaving a dead band under the item | Cart at 1440 | Accept | `h-fit` on the list |
+| Touch targets under 44px (footer, "View all", wordmark, cart link, quick add, remove, chips) | Audit at 320-430 | Accept | 44px for touch, 36px for fine pointers |
+| Dashed border on the shadcn `Empty` component | Empty-search screenshot | Accepted as is | Hairline dashed reads as an intentional "nothing here"; changing the shared primitive is not worth it |
+| Suggestions to add colour, imagery, delight or a stronger brand moment on confirmation | n/a | Rejected | Conflicts with D20 (restraint, no decorative colour); the green check is the only semantic colour used |
+
+## Heuristic view (single reviewer, honest scores)
+
+Visibility of status 3 (live filter count, cart badge, pending buttons) · Match to real world 3 · User control 3 (undo remove, back-button-safe filters, guest checkout) · Consistency 3 (checkout and confirmation now match the other pages) · Error prevention 3 · Recognition 3 · Flexibility 3 (suggestions, quick add) · Minimalist design 4 · Error recovery 3 (decline keeps address; zero results offer a way out) · Help 2 (demo notes only). About 30/40.

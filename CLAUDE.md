@@ -2,11 +2,11 @@
 
 A rebuild of the Amazon shopping experience (Next.js, TypeScript, shadcn/ui) that must show product judgment, not a visual clone.
 
-Package manager: `pnpm`. No app is scaffolded yet (Phase 0); standard `pnpm dev|build|lint|test` apply once it is.
+Package manager: `pnpm`. Scripts: `pnpm dev|build|typecheck|lint|test|e2e`.
 
 ## Always
 
-- **Phase 0 until told otherwise**: plan, document, survey. Do not scaffold or write application code until the user unlocks Phase 1.
+- Build in small vertical slices, test-first at the module interfaces (`docs/agents/workflow.md`); the visual system is D20 (`docs/product-decisions.md`).
 - `recon/` is read-only reference material containing a real customer's session data. Never modify it, commit it, or copy values from it (see `docs/recon/privacy-notes.md`).
 - Never disable, replace or overwrite the capture hooks in `.claude/settings.json` / `.claude/hooks/capture.js`; merge new hooks alongside them. Never hand-edit `.agent-logs/`.
 - Do not push, create remotes, deploy, or install dependencies without being asked.

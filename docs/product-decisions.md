@@ -212,6 +212,15 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Mobile purchase:** a sticky Add to cart bar appears only while the main button is off-screen.
 - **Search state** lives in the URL (`k`, `c`, `min`, `max`, `r`, `stock`, `sale`, `sort`, `page`).
 
+## D22. P0-B: guest checkout stays; accounts add history, not a gate
+
+- **Guest checkout is kept.** Forced registration before paying is a known abandonment cause; checkout offers "Sign in" and works without it. This replaces the roadmap B1 wording "checkout redirects to sign-in" with a softer rule: sign-in is offered, never required.
+- **Cart and orders follow the person.** Signing in or registering merges the guest cart into the account cart (quantities add, clamped to stock) and claims the guest's orders into the account history. Orchestration lives in the app layer (`auth-actions.ts`); `auth`, `cart` and `orders` stay unaware of each other (`docs/modules.md` rule 3).
+- **Auth is deliberately small:** email + password (scrypt), opaque session cookie whose SHA-256 is stored, 30-day expiry, generic "do not match" error that costs the same for unknown emails, `returnTo` limited to same-site paths. No OAuth, no password reset, no email verification (demo; no email is sent).
+- **Orders:** history and detail share one view of the purchase-time snapshot. Status stays `placed`; progression is deferred (see `docs/p0b-priority-analysis.md`).
+- **Search** is deterministic: filler words ignored, one-letter typos tolerated for words of 4+ letters, and when no product has every word, products with at least half of the words are shown with an explicit notice. No ranking model.
+- **Touch targets:** 44px for coarse pointers; dense controls drop to 36px for fine pointers (still above the 24px WCAG 2.2 AA minimum).
+
 ## Review log
 
 | Date | Decision | Change |
