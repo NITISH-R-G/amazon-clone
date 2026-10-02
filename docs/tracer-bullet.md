@@ -81,3 +81,21 @@ After T13 is green: build the four thin pages against the modules, run the **man
 2. Exact `Actor`, `Cart`, `Order` field names are fixed when the first test (T1/T2) is written.
 3. Provisional shipping/tax rules are replaced if the checkout capture shows otherwise.
 4. The thin pages' layout waits for the PDP, cart and checkout-review captures (`docs/recon/site-peel-request.md`). T1–T13 do not depend on Amazon source and can run first once seams are confirmed.
+
+## Implementation record (Phase 1)
+
+T1 to T13 were implemented exactly as specified, one RED then GREEN at a time. T5 passed on its first run (isolation followed from keying carts by actor); it stays as an invariant guard.
+
+**Additions made while implementing (all additive; no boundary changed):**
+
+| Item | Why |
+|---|---|
+| Tests T14 to T21: invalid quantity, out-of-stock add, set quantity (+clamp), remove/restore, set-quantity validation and ownership, re-add after remove, `placeOrder` on an empty cart, incomplete address | The UI needs cart editing, and the stop condition requires empty-cart, invalid-quantity, insufficient-stock, declined and success handling; each added test-first |
+| `orders.findByIdempotencyKey(actor, key, tx?)` and `orders.getOrder` / `listOrders` | T11 needs a read before the write; T9/T12 need reads. `checkout` also takes a `pg_advisory_xact_lock` on `(actor, key)` so concurrent double submits serialise |
+| Optional `tx?: DbOrTx` on read functions (`getProduct`, `getVariant`, `getAvailability`, `getCart`, `listOrders`, …) | Lets `placeOrder` read inside its transaction (consistent snapshot) |
+| Modules are factories (`createCatalog({ db })`, `createCart({ db, catalog })`, …) wired in `src/server/app.ts` | Explicit dependency injection; the same wiring is used by the runtime and tests (`src/test-support/app.ts`) |
+| Database: PGlite (in-process Postgres) + Drizzle migrations in `drizzle/` | Resolves open item 1; real Postgres semantics and transactions with no native build |
+| `CartError` gains `LINE_NOT_FOUND` | Ownership check on line operations |
+| ESLint `no-restricted-imports` | Enforces "import modules only through `index.ts`" and "modules do not import `app/` or `components/`" |
+
+Authorising payment inside the database transaction is deliberate for the demo provider (synchronous, no money moves). A real provider would need a two-phase flow; out of scope.
