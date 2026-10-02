@@ -1,88 +1,110 @@
 # UI policy and shadcn/ui requirements
 
-Read before any UI work. Design context for Impeccable is `PRODUCT.md`; tokens are in `docs/recon/design-tokens.md` §2; component boundaries are in `docs/recon/component-inventory.md`.
+Read before any UI work. Visual direction: `docs/recon/visual-system-proposal.md` (**approved**, decision D20). Design context for Impeccable: `PRODUCT.md`. Component boundaries: `docs/recon/component-mapping.md` and `component-reuse-map.md`. The visual system is **not implemented yet**; the current tracer UI is provisional (D19) and uses an older yellow/navy look that the visual-system slice replaces.
 
 ## Policy
 
-- **shadcn/ui is the primary primitive layer.** Use an existing shadcn primitive wherever one fits; do not recreate it.
-- Do not add another UI library when shadcn/ui is sufficient. Icons: `lucide-react` (shadcn default).
-- If a needed primitive is missing from shadcn **and** the component materially affects the design, name it and **ask the user before inventing a replacement**. Small compositions of existing primitives (below) do not need to be asked about.
-- Install components **on demand**, one slice at a time, with the shadcn CLI. Do not install the whole registry.
-- Consistent spacing (4 px grid), type scale, interaction states (default, hover, focus-visible, active, disabled, loading, error), accessibility and responsive behaviour come from tokens and primitives, not per-component overrides. One focus ring everywhere.
-- Presentational components take plain typed props; no data fetching inside primitives.
+- **shadcn/ui is the primary primitive layer.** Use semantic theme tokens (`background`, `foreground`, `primary`, `muted`, `border`, `ring`, `destructive`, ...). Compose domain components from primitives. Do not build a parallel primitive system.
+- Use a primitive **only when its semantics match** the UI. Do not use a component because it exists. Do not make every section a `card`; do not round every interactive element.
+- Do not add another UI library when shadcn/ui is sufficient. Icons: `lucide-react`.
+- If a needed primitive is missing from shadcn **and** it materially affects the design, name it and ask before inventing a replacement. Compositions of existing primitives need no ask.
+- Install components **on demand**, one slice at a time, with the shadcn CLI. Never install the registry. Verify a component exists in the installed shadcn version (`field`, `empty`, `command` are newer additions) before relying on it.
+- Every interactive component has default, hover, focus-visible, active, disabled, loading and error states where applicable; keyboard and screen-reader operation are part of "done".
+- Presentational components take plain typed props; no data fetching in primitives.
 
-## Phase 1 first slice: install only this
+## Design language (summary; full detail in the proposal)
 
-The tracer bullet (`docs/tracer-bullet.md`) has four thin pages and needs exactly: `button`, `input`, `label`, `card`, `separator`. Install those when the first page needs them; add every other component only in the slice that uses it. No domain component (`ProductCard`, `ProductGallery`, `PriceBlock`, `RatingStars`, `QuantityStepper`, `VariantPicker`, `ProductRail`) is built before its slice, and none exists today. Domain components are compositions of shadcn primitives; no parallel primitive system.
+Apple-inspired restraint, **not an Apple clone**: no Apple assets, logos, typography or exact layouts. Predominantly monochrome; typography and whitespace carry hierarchy; flat surfaces; hairline borders before shadows; minimal functional shadows; restrained geometry; motion that explains state changes; strong accessibility.
 
-## Required shadcn components (validated against the planned UI)
+### Tokens (starting values; tune and contrast-check at implementation)
 
-Status of the repo today: no `components.json`, nothing installed. **Already available: none.** "Install" below means `shadcn add <name>` during the slice that first needs it.
+| Group | Decision |
+|---|---|
+| Palette | White, near-white (`#f5f5f5`), black/near-black (`#0a0a0a`), neutral greys. **No brand hue** (no orange, green, blue, purple, brown) |
+| Primary action | Black fill (`--primary: #0a0a0a`), white text; hover `#262626` |
+| Secondary action | White/neutral surface, black text, subtle border (`#e8e8e8`; inputs `#d4d4d4`) |
+| Text | `--foreground #0a0a0a`; `--muted-foreground #6b6b6b` (about 5.3:1) |
+| Semantic only | `--destructive #c8281e` (errors), `--success #1a7f37` (success/savings, sparingly), `--info #0a5bd8` (informational links). Never used as brand or decoration |
+| Focus | 2 px `#0a0a0a` ring with a 2 px white offset on every interactive element |
+| Radius | Base 8 px; controls 6 to 10 px; larger surfaces (sheet, dialog, image wells) 12 px; badges 6 px. No pill buttons |
+| Shadows | None at rest. Only floating layers: `0 8px 24px -8px rgb(0 0 0 / 0.14)` with a hairline |
+| Typography | One neutral sans. **Recommendation: Hanken Grotesk** (fallback Public Sans), confirmed by specimens. Not Inter, Geist or Figtree. Weights 400/500/600 (700 rare); tabular numerals for prices, quantities, totals |
+| Type scale | 12/16, 13/18 (compact labels), 14/20, **16/24 body and inputs (16 minimum)**, 20/28, 24/30, 32/38 (-0.02em), 40/44 (-0.025em), display at most 56 px; tracking never below -0.04em |
+| Spacing | 4 px base: 4, 8, 12, 16, 24, 32, 48, 64, 96. Touch targets at least 44 px |
+| Motion | 120 to 200 ms ease-out (sheets 220 to 280 ms); no autoplay, no parallax; `prefers-reduced-motion` respected |
 
-### Install: P0-A (demo-critical path)
+### Component principles
 
-| Component | First needed by | Why |
+1. **Content over chrome**: imagery and information lead; UI furniture recedes.
+2. **One primary action per surface** (black). Secondary is outline; tertiary is quiet text. A disabled primary always explains why.
+3. **Group with space and `separator`**, not boxes. Borders only where scanning improves.
+4. **Product card**: image-first, no dashboard-card chrome; title (2 lines), optional rating, price hierarchy, one cue line (availability or saving), restrained add action; the whole card is one link.
+5. **PDP**: large imagery, clear title, rating, price, variants, availability, delivery, quantity; a **dominant black primary action** (size, contrast, placement, not colour); sticky purchase bar on mobile.
+6. **Cart**: product, quantity, price, subtotal, savings, checkout CTA; lines separated by hairlines; recommendations never overpower it.
+7. **Checkout**: reduced header, compact step indicator, strong section separation, persistent summary with obvious totals, no promotions.
+8. **Destructive actions** are visually restrained (text-weight red) and confirmed or undoable.
+9. **States are designed**: skeletons shaped like the final layout, `empty` states with a next action, inline `alert` errors that name the problem and the recovery.
+10. **Mobile is designed, not shrunk**: search on its own row, `sheet` menus and filters, stacked layouts, 44 px targets. **No bottom navigation by default**; add only if the decision test in the proposal justifies it.
+
+## shadcn components
+
+Status today: installed `button`, `input`, `label`, `card`, `separator` (the tracer). Everything else is installed in the slice that first needs it.
+
+### Preferred set (install per slice, only when semantics match)
+
+| Component | Use it for | First needed by |
 |---|---|---|
-| `button` | everything | CTA yellow primary, buy-now orange, secondary, ghost, icon variants |
-| `input` + `label` | search, forms, quantity | Search box, address/payment fields |
-| `select` | header department picker, quantity, sort | Native `<select>` is acceptable inside the header search; shadcn `select` elsewhere |
-| `badge` | cards, header cart count, deals | Deal %, stock, cart count |
-| `card` | product card, home promo, order card | `a-cardui` analogue |
-| `separator` | PDP, cart, checkout summary | |
-| `skeleton` | every data route | Replaces Amazon's spinner GIF (decision D8) |
-| `sonner` | add-to-cart, errors | Toast with "View cart" and undo |
-| `dropdown-menu` | account menu in header | Click/focus-operable, not hover-only |
-| `sheet` | mobile menu, mobile filters (side=bottom) | Covers the "drawer" need; the separate `drawer` (vaul) is **not** installed |
-| `checkbox`, `radio-group` | search filters, delivery options, payment method | |
-| `form` (or current shadcn form/field primitive; confirm at install) | checkout, auth | zod + react-hook-form validation at the boundary |
-| `breadcrumb` | results, PDP | Category context; confirm design against PDP capture first |
-| `pagination` | search results | Sort/filter live in the URL |
-| `aspect-ratio` | product images | Stable layout, no CLS |
+| `button` | all actions; black primary, outline secondary, ghost, link | everything (installed) |
+| `input`, `label` | text entry (installed) | forms, search |
+| `field` | label + description + error composition for forms | checkout, auth (verify availability) |
+| `select` | sort, quantity (if a list), department scope | search/results |
+| `checkbox`, `radio-group` | facets, delivery and payment options, variant picker | results, PDP, checkout |
+| `sheet` | mobile menu, filters, optional mini-cart | shell, results |
+| `dialog` | blocking confirmations (cancel order), location chooser | account, orders |
+| `popover` + `command` | search suggestions | P1 |
+| `dropdown-menu` | account menu | shell |
+| `skeleton` | layout-shaped loading (replaces the tracer's pulse blocks) | every data route |
+| `alert` | inline errors, availability notices | PDP, checkout, auth |
+| `badge` | small neutral labels (savings, low stock) | cards |
+| `separator` | grouping (installed) | everywhere |
+| `pagination` | results | results |
+| `carousel` | manual product rails only if CSS scroll-snap is insufficient; never autoplay | Home, PDP |
+| `aspect-ratio` | image wells | cards, gallery |
+| `empty` | empty cart, no results, no orders (verify availability) | cart, results, orders |
+| `sonner` | undo and add feedback (P1) | cart |
+| `slider` | price range facet | results |
+| `accordion` | product details, help | PDP |
+| `tabs` | order filters (if the semantics fit) | orders |
+| `breadcrumb` | only if a breadcrumb is evidenced (none was) | PDP/results |
 
-### Install later: P0-B / P1 / P2 (do not install in P0-A)
+Not needed unless a need appears: `navigation-menu`, `hover-card`, `avatar`, `table`, `scroll-area`, `toggle-group`, `drawer`, `calendar`, `chart`, `resizable`, `sidebar`. `card` is kept for genuinely bounded objects (address, order summary), not layout.
 
-| Component | Needed by | Tier |
+### Custom composition from primitives (no ask needed)
+
+| Component | Built from |
+|---|---|
+| `ProductCard` | `aspect-ratio`, `badge`, `button` (no `card` chrome by default) |
+| `ProductRail` | CSS scroll-snap (+ manual `carousel` if needed) |
+| `RatingStars` | lucide `Star` + hidden text |
+| `QuantityStepper` | `button` + `input` (exists) |
+| `VariantPicker` | `radio-group` styled as text/swatch options with disabled out-of-stock states |
+| `SearchBar`, `SearchSuggestions` | `input`, `select`, `button`; `popover` + `command` |
+| `AccountMenu` | `dropdown-menu` |
+| `CheckoutSteps`, `OrderTimeline` | plain list + lucide icons |
+| `AddressForm`, `PaymentSelector` | `field`, `input`, `radio-group` |
+| `PageStates` (loading/empty/error) | `skeleton`, `empty`, `alert`, `button` |
+
+### Truly custom (confirm before building if design-critical)
+
+| Component | Reason | Ask? |
 |---|---|---|
-| `alert` | inline error/empty banners, checkout errors | P0-B |
-| `dialog` | location chooser, cancel-order confirm | P0-B |
-| `tabs` | order filters, account sections | P1 |
-| `popover` + `command` | search suggestions combobox | P1 |
-| `tooltip` | help hints ("How do I find this?") | P1 |
-| `accordion` | Help/returns FAQ | P2 |
-| `textarea` | reviews | P2 |
-| `carousel` (embla) | **only if** CSS scroll-snap rails prove insufficient | P1 |
+| `PriceBlock` | Price typography: whole amount large, raised symbol and cents, tabular numerals, struck list price, screen-reader full price (exists; restyle) | No |
+| `ProductGallery` | Thumbnail strip + large image + zoom, keyboard and swipe (exists; extend) | Yes, at the PDP slice |
+| Logo / wordmark | Trademark and identity decision pending | **Yes** |
 
-### Not needed (do not install without a reason)
+## Before the visual-system slice
 
-`navigation-menu` (sub-nav is a scrolling link list), `hover-card`, `avatar`, `table` (orders use cards), `scroll-area`, `toggle-group` (variant picker composes `radio-group`), `drawer`, `calendar`, `chart`, `resizable`, `sidebar` (account nav is a small link list).
-
-## Custom composition from primitives (no ask needed)
-
-| Component | Built from | Notes |
-|---|---|---|
-| `ProductCard` | `card`, `aspect-ratio`, `badge` | Whole-card link; 1 to 4 line clamp |
-| `ProductRail` | CSS scroll-snap container + `button` | Add `carousel` only if needed |
-| `RatingStars` | lucide `Star` + `sr-only` text | Not a shadcn primitive; low design risk |
-| `QuantityStepper` | `button` + `input` (or `select` for 1..10) | Not a shadcn primitive |
-| `VariantPicker` | `radio-group` styled as swatches/pills | Availability states per option |
-| `SearchBar` | `input`, `select`, `button` | Header form, `role=search` |
-| `CartCountBadge` | `badge` | Live-region announcements |
-| `AccountMenu` | `dropdown-menu` | |
-| `OrderTimeline` | plain list + lucide icons | |
-| `AddressSelector`, `PaymentSelector` | `radio-group`, `card`, `form` | |
-| `PageStates` (loading/empty/error) | `skeleton`, `alert`, `button` | Only extract a shared helper once repetition appears |
-
-## Truly custom (no shadcn equivalent; confirm before building if design-critical)
-
-| Component | Reason | Needs user ask? |
-|---|---|---|
-| `PriceBlock` | Amazon price typography: superscript currency symbol and cents, strike-through list price, screen-reader full price | No: typography task, covered by the tokens |
-| `ProductGallery` | Thumbnail rail + zoom/large image, keyboard and swipe | **Yes**, once the PDP capture exists (materially affects the design) |
-| `AmazonHeader` / `CategoryNav` / `Footer` layout | Brand-specific shell | No: composed from primitives, verified against `docs/recon/page-map.md` |
-| Logo / wordmark | Trademark decision pending | **Yes** (see `docs/recon/asset-inventory.md`) |
-
-## Before Phase 1
-
-1. `pnpm dlx shadcn@latest init` (Phase 1 scaffold step, not now) with tokens from `design-tokens.md` §2.
-2. Install only the P0-A table above, and only as slices need them.
-3. Re-validate this list against the PDP, search and checkout source once Site Peel material arrives; amend this file, do not fork it.
+1. Confirm the typeface with specimens; add it via `next/font`.
+2. Write the tokens above into `globals.css` as shadcn variables; remove the tracer's yellow, navy, `--buy`, `--price`, `--deal`, `--rating`.
+3. Add only the primitives the slice needs.
+4. After the first real UI exists: Impeccable `critique`, `audit`, `polish`, applied selectively; then `impeccable document` for `DESIGN.md`.

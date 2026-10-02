@@ -1,82 +1,127 @@
-# Visual system proposal
+# Visual system: approved direction
 
-Status: **proposal, not implemented.** The tracer's provisional look borrows Amazon's colour roles (yellow primary, navy header). This proposal replaces that with an original identity while keeping the commerce interaction conventions shoppers rely on. The Impeccable detector already flags Inter as an overused face (D18). Impeccable `shape`/`critique` runs on the first implemented system, not before; `DESIGN.md` is recorded afterwards with `impeccable document`.
+Status: **APPROVED DIRECTION (user override, 2026-10-02). Not implemented.** This replaces the earlier "calm market" proposal, which is rejected and not preserved (no warm paper surfaces, no green or orange brand, no earthy palette, no generic friendly-ecommerce styling, no heavy rounding, no heavy shadows, no decorative gradients). Decision record: D20 in `docs/product-decisions.md`. Implementation rules: `docs/ui.md`.
 
-## What the evidence says we must NOT reproduce
+## Direction in one paragraph
 
-Amazon: dark navy header bars, yellow/orange action buttons, the Ember typeface, dense text-link navigation, the 4-up result grid. Flipkart: blue brand colour and yellow brand tiles, percentage-off label bars, dense promo rails. YNS and shadcnspace: very rounded image wells and marketing-style sections. We keep **roles and affordances**, not looks: one dominant action per surface, price and rating placement, quiet borders instead of shadows, visible focus.
+Premium, product-first commerce with **Apple-level restraint**: predominantly monochrome (white, near-white, black, near-black, neutral greys), typography and whitespace carrying hierarchy, flat surfaces with hairline borders, restrained geometry, and motion that explains state changes. shadcn/ui is the implementation foundation; the identity is ours. It is an inspiration direction, **not an Apple clone**: no Apple assets, logos, SF Pro, or exact layouts. Amazon and Flipkart remain behavioural/product evidence only.
 
-## Direction: "calm market"
+## Principles (design rules we will check against)
 
-A bright, warm-neutral surface with one confident green for action and quiet ink for everything else. It should feel like a well-run independent store: clear, trustworthy, a little editorial, never shouting. Red is reserved for errors; savings are shown in the action green (positive), not red.
+1. Content dominates chrome: product imagery and information first, UI furniture second.
+2. Controls communicate hierarchy visually: one primary action per surface, clearly secondary alternatives, quiet tertiary actions.
+3. Whitespace groups; boxes are the exception. Use spacing and `Separator` before borders, borders before shadows.
+4. Motion explains state changes (added, removed, loading, opened). It never decorates.
+5. Destructive actions are clear but visually restrained (text-weight red, always confirmed or undoable).
+6. Important actions are immediately discoverable (primary action visible without scrolling on PDP, cart and checkout).
+7. Typography carries hierarchy (size, weight, tracking) instead of colour or boxes.
+8. Borders are extremely subtle.
+9. No visual noise: no gradients, no glass, no emoji, no sparkles, no uniform icon-in-circle cards.
+10. Responsive behaviour is designed per breakpoint, not merely compressed.
 
-## Colour (roles first; hex are starting values to be tuned in Impeccable and checked for AA)
+## Colour tokens (shadcn semantic variables)
 
-| Role | Direction | Starting value | Contrast note |
+Monochrome base. **No brand hue.** Semantic colours appear only where meaning requires them and never as decoration. Values are starting points to tune and contrast-check at implementation (ratios computed on white).
+
+| Token | Role | Value | Notes |
 |---|---|---|---|
-| Page surface ("paper") | warm off-white | `#f7f5f0` | |
-| Card surface | white | `#ffffff` | hairline border `#e6e2d8` |
-| Image well | slightly deeper warm | `#f1eee7` | |
-| Ink (text) | warm near-black | `#171715` | about 16:1 on white |
-| Muted text | warm grey | `#5c5b55` | about 6.7:1 on white, about 5.9:1 on paper |
-| **Primary action** | deep pine green | `#0f5c4a` (hover darker `#0b4a3b`) | about 7.9:1 against white text |
-| Secondary action | ink outline | border `#171715` | |
-| Buy-now | solid ink | `#171715` on white text | |
-| Savings / in stock | primary green | `#0f5c4a` | positive, not red |
-| Deal badge | tint + ink | background `#e3efe9`, text `#0b4a3b` | |
-| Error / destructive | crimson | `#b3261e` | about 6.4:1 on white |
-| Link | primary green, underlined on hover | `#0f5c4a` | |
-| Focus ring | 2 px primary with 2 px offset | `#0f5c4a` | visible on paper and white |
-| Header | light, hairline bottom border | white on `#e6e2d8` | |
+| `--background` | Page | `#ffffff` | |
+| `--foreground` | Text | `#0a0a0a` | near-black, about 19:1 |
+| `--card` / `--popover` | Raised surfaces | `#ffffff` | |
+| `--muted` | Quiet fills, image wells | `#f5f5f5` | near-white neutral (not warm) |
+| `--muted-foreground` | Secondary text | `#6b6b6b` | about 5.3:1 on white |
+| `--border` / `--input` | Hairlines | `#e8e8e8` (inputs `#d4d4d4`) | extremely subtle; input border slightly stronger for affordance |
+| `--primary` | Primary action | `#0a0a0a` | black fill |
+| `--primary-foreground` | | `#ffffff` | |
+| `--secondary` | Secondary action surface | `#ffffff` with `--border` outline | white/neutral, black text |
+| `--secondary-foreground` | | `#0a0a0a` | |
+| `--accent` | Hover/selected fill | `#f5f5f5` | |
+| `--ring` | Focus ring | `#0a0a0a` (2 px, 2 px offset, white gap) | visible on white and on black buttons |
+| `--destructive` | Errors, delete | `#c8281e` | about 5.5:1; text-weight, not filled banners |
+| `--success` (semantic) | Success, savings, in stock | `#1a7f37` | about 5.1:1; used sparingly |
+| `--info` (semantic) | Informational/link semantics | `#0a5bd8` | about 6.0:1; only when meaning needs it |
+| Hover (primary) | | `#262626` | |
+| Overlay scrim | Sheets and dialogs | `rgb(0 0 0 / 0.4)` | |
 
-Dark mode: not planned (P3). Tokens stay role-based so it can be added.
+Deliberately **not** used: any orange, green, blue, purple or brown brand colour; the earlier yellow primary and navy header of the tracer are replaced in the visual-system slice. Dark mode is out of scope for now (tokens are role-based so it can be added).
 
 ## Typography
 
-- **Family**: one humanist-geometric sans for the whole UI. Recommendation to validate in Impeccable: **Figtree** (via `next/font`, not on the detector's overused list), weights 400, 500, 600, 700. Replace Inter once confirmed (user decision on font substitution is still open).
-- **Numerals**: `font-variant-numeric: tabular-nums` for prices, quantities and totals so columns align.
-- **Scale** (px / line-height): 12/16 caption, 14/20 secondary, **16/24 body and inputs (minimum for inputs)**, 18/26 card titles and section lead, 20/28 price in cards, 24/32 PDP title, 32/40 page and hero titles, 40/48 hero display. Weight steps: 400 body, 500 UI labels, 600 titles, 700 price emphasis.
-- **Price typography**: whole amount large, currency symbol and cents smaller and raised (as in the tracer `PriceBlock`), full amount exposed to screen readers once.
+**Evaluation (neutral modern sans, free via `next/font/google`, OFL):** Inter and Geist are rejected (the Impeccable detector flags both as overused, and Inter is the tracer's current face). Figtree is rejected by the user's instruction. Shortlist and notes:
+
+| Candidate | Character | Fit for premium commerce | Risk / check |
+|---|---|---|---|
+| **Hanken Grotesk** | Clean grotesque, balanced, open apertures, quiet personality | **Recommended**: neutral and precise; holds up at large sizes with tight tracking; clear small-size labels | Confirm `tnum` (tabular figures) renders before committing |
+| Public Sans | Utilitarian, very neutral, strong numerals | Good fallback: excellent readability and form-heavy UI | Slightly plain at display sizes |
+| IBM Plex Sans | Engineered, slightly technical | Credible and sturdy; distinctive numerals | Can feel technical rather than premium |
+| Instrument Sans | Refined grotesk with character | Premium feel | Fewer weights on Google Fonts; verify numerals |
+| Host Grotesk / Mona Sans / Schibsted Grotesk | Contemporary grotesks | Possible | Check numerals and availability in `next/font` |
+
+**Recommendation: Hanken Grotesk** (fallback Public Sans), confirmed by rendering real price and quantity specimens in the implementation slice. One family for everything; no SF Pro imitation.
+
+- **Weights**: 400 body, 500 UI labels, 600 titles and prices, 700 rare. Restrained.
+- **Numerals**: `font-variant-numeric: tabular-nums` for prices, quantities, totals and order tables; `lining-nums`.
+- **Scale (px / line-height / tracking)**: 12/16 captions; **13/18 compact UI labels**; 14/20 secondary; **16/24 body and inputs (16 minimum for inputs)**; 20/28 section titles; 24/30 product title in lists; 32/38, -0.02em PDP title and page titles; 40/44, -0.025em hero/display on desktop; display never above 56 px in the product UI. Tracking never below -0.04em. Large headings use balanced wrapping.
 - **Measure**: body 65 to 75 characters; product titles clamp to 2 lines in cards.
+- **Price hierarchy**: current price semibold and largest; list price struck, muted; saving in `--success` text only when real.
 
-## Spacing
+## Shape, spacing, surfaces
 
-4 px base, steps 4, 8, 12, 16, 24, 32, 48, 64. Card padding 12 to 16; grid gaps 16 (cards) and 24 (page columns); section spacing 32 to 48 desktop and 24 to 32 mobile; **tight inside groups, generous between groups**; touch targets at least 44 px; page gutter 16 mobile, 24 tablet, 32 desktop; content max width about 1200 to 1280 px.
+- **Radius**: base `0.5rem` (8 px). Controls 8 px (range 6 to 10); larger surfaces (sheets, dialogs, image wells) 12 px; badges 6 px; avatars circular. **No pills for buttons; do not round everything.** One consistent shape language across buttons, inputs, selects, dialogs.
+- **Spacing**: 4 px base; steps 4, 8, 12, 16, 24, 32, 48, 64, 96. Section spacing 48 to 96 desktop and 32 to 48 mobile; **space groups, do not box them**. Touch targets at least 44 px. Content max width about 1280 px with generous gutters (16 mobile, 24 tablet, 32 to 48 desktop).
+- **Surfaces**: flat. Hierarchy = white page, `--muted` wells for imagery, hairline borders only where scanning improves. **Shadows minimal and functional**: only floating layers (popover, dropdown, sheet, dialog) get a soft shadow `0 8px 24px -8px rgb(0 0 0 / 0.14)` plus a hairline; sticky header uses a bottom hairline; a sticky purchase bar uses a top hairline.
 
-## Radii and borders
+## Component principles (shadcn first)
 
-Controls 8 px; cards and image wells 12 px; chips and badges fully rounded; sheets 16 px on their free corners; avatars 50%. Borders are hairline (1 px) in the warm border colour; focus uses a ring, not a thicker border.
+shadcn/ui is the only primitive layer; use its semantic theme tokens; compose domain components from primitives; no parallel primitive system. Use a primitive **only when its semantics match**:
 
-## Surface hierarchy
+| Need | Use | Not |
+|---|---|---|
+| Primary / secondary / quiet actions | `button` (default black, `outline`, `ghost`, `link`) | custom styled `div`s |
+| Text entry and forms | `input`, `field` (label + description + error), `label`, `select`, `checkbox`, `radio-group` | bare inputs with ad-hoc labels |
+| Overlays | `sheet` (mobile menu, filters, mini-cart), `dialog` (confirm, location), `popover` + `command` (suggestions), `dropdown-menu` (account) | modals for non-blocking tasks |
+| Status and feedback | `alert` (inline, specific), `badge` (small neutral labels), `skeleton` (layout-shaped loading), `empty` (no results, empty cart, no orders; verify availability in the installed shadcn version) | banners in brand colour |
+| Structure | `separator`, `aspect-ratio`, `pagination`, `breadcrumb` (only if evidenced), `carousel` (manual only, no autoplay) | wrapping every section in `card` |
 
-1. Paper (page) 2. Card (white, hairline border, no shadow at rest) 3. Image well inside cards 4. Raised overlays (popover, dropdown, sheet, dialog): white with a soft shadow (`0 8px 24px rgb(23 23 21 / 0.12)`) and a hairline. Elevation is mostly **border-based**; shadows only for things that float. No nested cards.
+Rules: **do not make every section a Card**; cards are for genuinely bounded objects (a saved address, an order summary), not for layout. Do not round every interactive element. Do not install a component because it exists (`docs/ui.md`).
 
-## Button language
+## Ecommerce surfaces (what each should feel like)
 
-Primary: solid pine, white text, 10 px radius, medium weight. Secondary: ink outline on white. Quiet: text button in the link colour. Buy now: solid ink. Destructive: text in crimson with confirmation. All: visible focus ring, disabled state keeps readable contrast plus an explanatory message (never a silent grey button), loading state replaces the label with a short progress label and prevents double submit. Icon buttons have a visible label or tooltip and an accessible name.
+- **Product card**: image-first, no dashboard-card chrome. Image on a `--muted` well (4:5 or square), then title (2 lines, 500), optional rating (small), price hierarchy, one cue line (availability or saving). A restrained add action (outline or ghost button, always available on touch, on hover or focus on desktop). Border only when scanning needs it (e.g. dense lists). The whole card is one link.
+- **PDP**: premium and editorial yet transactional. Large product imagery with a thumbnail strip, clear title, rating, price, variant selection, availability, delivery information, quantity, and a **dominant black primary action** (dominance by size, contrast and placement, not colour). Details below as quiet sections separated by space and hairlines. Mobile: single column and a **sticky purchase bar** (price + primary action) once the buy box scrolls out of view.
+- **Cart**: product, quantity, price, subtotal, savings, checkout CTA. Lines separated by hairlines, not boxes. Summary is a quiet column with itemised, honest totals. Recommendations (if any) sit below the cart and never compete with it.
+- **Checkout**: calm and trustworthy. A reduced header, a compact step indicator, clear section separation with generous space, a persistent summary with obvious totals, one obvious primary action, no promotions.
+- **Search**: a large, precise search field as the header's centre; suggestions in a `command` list; results with a count, sort and short facets; numbered pagination; shareable URL state.
 
-## Card treatment
+## Mobile (first-class)
 
-Product card: image well (square or 4:5), then title (2 lines), rating (stars + count), price (+ list price), one cue line (stock, delivery) and an action. Deal and low-stock cues are text or small tint badges, never red banners. Hover/focus lifts the card with a border-colour change and a short shadow; the whole card is **one link** (accessible name = title + price). No sponsored or "bought in past month" claims.
+Designed, not shrunk: search on its own row; category strip; `sheet` for the menu and filters; stacked layouts; **sticky purchase action on PDP**; 44 px targets; summary after the form on checkout with the total in the button.
 
-## Navigation treatment
-
-Header is light with a hairline: wordmark, a large search field that is the visual centre, account menu, cart with a count badge. Below it a short category strip with icons (scrolls horizontally on small screens). Checkout and sign-in use a reduced header (wordmark, step label, secure note). On mobile: search on its own row, category strip, optional bottom bar for Home / Search / Cart / Account (decision pending). Active states use weight and an underline, not colour alone.
+**Bottom navigation: not added by default.** Decision test (answer with evidence in the first mobile pass): does it shorten the journeys that matter (Home to Search to PDP to Cart to Checkout) without hiding the purchase action? On PDP and checkout a bottom bar competes with the sticky purchase bar and the keyboard, and cart/search are already in the header. Default: **no bottom bar**; revisit only if tap-count measurements from deep pages show a real problem.
 
 ## Motion
 
-Few, short, purposeful. Ease-out exponential, 150 to 220 ms. Opportunities: cart count "bump" when an item is added; add-to-cart confirmation slides in and out; filter sheet and mobile menu slide; image cross-fade in the gallery; skeleton shimmer (static under `prefers-reduced-motion`). No auto-advancing carousels, no parallax, no scroll-jacking. All motion respects `prefers-reduced-motion`.
+Purposeful, short, exponential ease-out, 120 to 200 ms for state changes, 220 to 280 ms for sheets. Examples: add-to-cart button label morphs to "Added" with a check, cart count ticks; item removal collapses with an Undo; gallery image cross-fades; sheet slides; skeletons are static or a very subtle opacity change. **No autoplay carousels, no parallax, no attention-grabbing loops.** Everything honours `prefers-reduced-motion` (instant state changes).
+
+## Accessibility baseline
+
+WCAG 2.2 AA: text at least 4.5:1, large text 3:1, visible 2 px focus ring on every interactive element, keyboard operation, correct landmarks and names, 44 px targets, 200% zoom, reduced motion. Colour is never the only carrier of meaning (errors have text and icon; savings have words).
+
+## Not to look like
+
+Amazon (orange/yellow, navy bars, dense link rows), Flipkart (blue and yellow tiles, discount label bars), a generic shadcn demo (uniform cards, default zinc theme untouched), a Tailwind marketing template (gradient heroes, glass), or an AI-generated ecommerce starter (emoji, sparkles, three-up icon cards, rounded everything).
 
 ## Implementation notes (not started)
 
-- Express as CSS variables mapped to shadcn tokens (`--primary`, `--background`, `--card`, `--border`, `--ring`, `--radius`, plus `--paper`, `--well`, `--ink`) in `globals.css`; do not hard-code hex in components.
-- Replace the tracer's yellow primary and navy header in the visual-system slice; domain code is untouched.
-- Validate contrast with the existing contrast approach (hand-checked ratios above; add an automated check in the slice).
-- After the first implemented system: Impeccable `critique`, then `audit`, then `polish`, as planned in `docs/agents/workflow.md`.
+1. Express tokens as shadcn CSS variables in `globals.css` (plus `--success`, `--info`); no hard-coded hex in components.
+2. Replace the tracer's yellow primary, navy header, `--buy`, `--price`, `--deal` and `--rating` tokens in the visual-system slice; domain code is untouched.
+3. Swap Inter for the confirmed face via `next/font`; add tabular figures to price components.
+4. Automate a contrast check for the token pairs.
+5. Impeccable: context updated now (`PRODUCT.md`); after the first real UI exists run `critique`, then `audit`, then `polish`, applying results selectively; record `DESIGN.md` with `impeccable document` once code exists.
 
-## Open decisions for the user
+## Open decisions
 
-1. Approve the "calm market" direction (green, warm paper) or request another.
-2. Confirm Figtree (or another non-Inter face).
-3. Logo/wordmark approach (placeholder "Cartly" stays until decided).
-4. Mobile bottom bar: yes or no.
+1. Confirm Hanken Grotesk (or Public Sans) after specimen rendering.
+2. Wordmark/logo approach (placeholder "Cartly" stays until decided).
+3. Dark mode: later or never.
+4. Bottom navigation: default no, subject to the decision test above.

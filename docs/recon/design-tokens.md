@@ -1,5 +1,7 @@
 # Design tokens
 
+> **Superseded in part (D20):** sections 1 (source-derived) remain evidence about Amazon. Section 2 (implementation tokens) and section 3 (improvements) are **superseded** by the approved monochrome direction in `visual-system-proposal.md` and `docs/ui.md`; do not implement the yellow primary, navy header, `--buy`, `--price`, `--deal` or `--rating` tokens listed there.
+
 Three layers, kept separate (per the brief):
 
 1. **Source-derived**: measured from the supplied CSS (109 files, 12 MB concatenated, 47 unique). Frequencies are declaration counts across all bundles, so they show *prevalence*, not "design intent". Hex values are as found.

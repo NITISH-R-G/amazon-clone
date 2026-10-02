@@ -31,8 +31,9 @@ Evidence references are to `docs/recon/` (page-map, component-inventory, flow-ma
 | D15 | Scope boundaries | Constraint | n/a | all |
 | D16 | Provisional tracer layouts | Our own design, no source | None | A1 |
 | D17 | Checkout form behaviour | Improvement (additive) | Our own manual run | A1 |
-| D18 | Visual identity (tracer) | Constraint + our own | Observed tokens | A1 |
+| D18 | Visual identity (tracer) | **Superseded by D20** | Observed tokens | A1 |
 | D19 | Visual baseline provisional | Process decision | None | A1 |
+| D20 | Visual direction: monochrome, Apple-inspired, shadcn | **Approved override** | User direction + reference research | visual system |
 
 ---
 
@@ -174,7 +175,7 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Tradeoff**: small client-side formatting code; card fields are cleared after a decline (safer).
 - **Validation method**: domain tests T9, T11, T20, T21 for the server behaviour; manual run; tier-1 E2E.
 
-## D18. Visual identity for the tracer
+## D18. Visual identity for the tracer (SUPERSEDED by D20)
 
 - **Observed evidence**: Amazon's tokens are measured in `docs/recon/design-tokens.md` (yellow CTA, teal links, dark header). Its logo is a trademark and its font is proprietary and was not captured.
 - **Problem/opportunity**: be recognisably a shopping product without reproducing Amazon's brand.
@@ -192,9 +193,20 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Tradeoff**: until then the UI is functional but not faithful to Amazon, and the generic typeface and placeholder wordmark remain.
 - **Validation method**: when the captures arrive, map their structure to existing components and routes, record what changed in D4, D5 and D6, and re-run the tier-1 E2E unchanged.
 
+## D20. Visual direction: monochrome, Apple-inspired, shadcn-based (supersedes D18)
+
+- **Observed evidence**: Amazon and Flipkart are dense, promotion-heavy and colour-branded (yellow/orange and navy; blue and yellow tiles). Open-source references (YNS, shadcnspace) lean on very rounded surfaces and marketing-style sections (`docs/recon/open-source-reference-analysis.md`). The tracer's own look borrowed Amazon's colour roles (D18).
+- **Problem/opportunity**: the product must not read as Amazon, Flipkart, a generic shadcn demo, a Tailwind template or an AI-generated starter, while staying a serious, usable ecommerce app.
+- **Decision (user-approved override)**: a predominantly monochrome system (white, near-white, black, near-black, neutral greys); primary action black on white, secondary white/neutral with a subtle border; hairline borders before shadows, minimal functional shadows; restrained geometry (about 6 to 10 px for controls, 8 to 12 px for larger surfaces); a neutral modern sans (recommendation Hanken Grotesk, to be confirmed by specimens; not Inter, Geist or Figtree) with tabular numerals for prices; semantic colour (red error, green success/savings, blue info) only where meaning requires it; shadcn/ui as the implementation foundation with semantic tokens; motion only to explain state changes, `prefers-reduced-motion` respected, no autoplay carousels. Apple is an inspiration for principles (hierarchy, restraint, typography, spacing, clarity), not for assets, typography or layouts. **Rejected and not preserved**: the "calm market" proposal (warm paper, deep green brand, orange, earthy palette, heavy rounding, decorative gradients).
+- **Reason**: restraint and typography give a premium, trustworthy feel and let product imagery and information lead, which suits commerce; a neutral base cannot be mistaken for either incumbent's brand; shadcn tokens keep the system consistent and cheap to change.
+- **Tradeoff**: without a brand colour the black primary action must win on size, contrast and placement (not hue); monochrome can read as cold or generic if typography and spacing are weak; fewer cheap attention devices (no coloured badges or banners).
+- **Validation method**: contrast checks for every token pair (AA); Impeccable `critique` then `audit` on the first implemented UI, applied selectively; browser review at 360, 768 and 1280 px; a "does the primary action win without colour?" check on PDP, cart and checkout; comparison against the "not to look like" list in `docs/recon/visual-system-proposal.md`.
+- **Sub-decisions**: bottom navigation is **not** added by default (decision test in the proposal); dark mode is out of scope for now; the wordmark stays a placeholder until you decide.
+
 ## Review log
 
 | Date | Decision | Change |
 |---|---|---|
 | 2026-10-02 | all | Proposed in Phase 0; Holds on D4, D5 (layout) and D6 until source arrives |
 | 2026-10-02 | all | Restructured to the six-field format; added evidence register |
+| 2026-10-02 | D20 | Visual direction overridden by the user; D18 superseded; "calm market" proposal rejected |

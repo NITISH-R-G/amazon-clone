@@ -19,11 +19,11 @@ Two audiences, confirmed by the user:
 
 ## Product Purpose
 
-Rebuild the Amazon shopping experience, covering discovery, product detail, cart, checkout, orders, account and help, as a working application. It is not a superficial visual clone. Success is a credible live demo where the core purchase journey works end to end and every deliberate improvement over Amazon is explainable.
+Build a working ecommerce application covering discovery, search, product detail, cart, checkout, orders and account, informed by Amazon and Flipkart behaviour. It is not a visual clone of either. Success is a credible live demo where the core purchase journey works end to end and every deliberate departure from the incumbents is explainable.
 
 ## Positioning
 
-A faithful but clearer take on the Amazon flow: it keeps Amazon's recognisable structure and familiarity, and removes its density, interruption and dark-pattern friction where that makes the shopper's task easier. Each departure from Amazon is recorded in `docs/product-decisions.md`.
+A serious ecommerce product with premium, restrained product design: conventional commerce behaviour (search, filters, product, cart, checkout, orders, account) with an identity of its own. Amazon and Flipkart are behavioural and product evidence only; each departure from them is recorded in `docs/product-decisions.md`.
 
 ## Operating Context
 
@@ -42,17 +42,27 @@ A faithful but clearer take on the Amazon flow: it keeps Amazon's recognisable s
 
 ## Brand Commitments
 
-Existing name and identity are Amazon's. The user wants the Amazon shopping experience rebuilt, so recognisable Amazon structure and visual intent are binding. Amazon trademarks and logo files must not ship as-is without an explicit decision (see `docs/recon/asset-inventory.md`).
+Binding visual constraints from the user (2026-10-02, decision D20; detail in `docs/recon/visual-system-proposal.md`):
+
+- Own identity. Must not look like Amazon, Flipkart, a generic shadcn demo, a Tailwind template or an AI-generated ecommerce starter.
+- Apple-level product-design principles (hierarchy, restraint, typography, spacing, clarity, subtle motion, strong accessibility) as inspiration only: no Apple assets, logos, typography or exact layouts.
+- Predominantly monochrome: white, near-white, black, near-black, neutral greys. Primary action black on white; secondary white/neutral with a subtle border. **No brand hue** (no orange, green, blue, purple or brown). Semantic colour (red error, green success/savings, blue info) only where meaning requires it.
+- Restrained geometry (about 6 to 10 px controls, 8 to 12 px larger surfaces), flat surfaces, borders before shadows, minimal functional shadows, no decorative gradients, no heavy rounding.
+- shadcn/ui as the implementation foundation with semantic tokens; compose domain components from primitives.
+- Motion only to explain state changes; respect reduced motion; no autoplay carousels.
+- Rejected and not to be reintroduced: the earlier "calm market" proposal (warm paper, deep green, orange, earthy palette).
+- Amazon trademarks, logo and imagery must not ship; the wordmark is a placeholder until the user decides.
 
 ## Evidence on Hand
 
-- `recon/pages/`: 9 saved Amazon pages (home, sign-in, today's deals, gift cards, your account, your Amazon.com, profile hub, returns centre, help) plus resource folders for two further pages (shopping cart, home & kitchen) whose HTML was not saved.
-- No product detail page, search results page or checkout page was supplied. Nothing about them may be fabricated; see `docs/recon/README.md`.
+- `recon/` and `recon-v2/` (git-ignored, local only): saved Amazon pages (home, sign-in step 1, deals, gift cards, account, profile, returns, help, PDP in an unshippable state, search results, cart with items, an early checkout step) and Flipkart pages (home with login modal, cart, checkout order-summary step, payments step; order history assets only). Findings are in `docs/recon/`.
+- Open-source references researched, not copied: Your Next Store and the shadcnspace ecommerce template (licence notes in `docs/recon/open-source-reference-analysis.md`).
+- Not captured and not to be fabricated: Amazon PDP buy-box states, checkout review, password step; Flipkart PDP and search results; orders list and order detail from either site.
 
 ## Product Principles
 
 1. The purchase journey comes first; everything else is secondary to a working add-to-cart, checkout and order-retrieval path.
-2. Familiar structure, clearer execution: keep what shoppers already know, remove what only exists for Amazon's benefit.
+2. Familiar behaviour, clearer execution: keep the commerce conventions shoppers already know, remove what only exists for an incumbent's benefit.
 3. Every state (loading, empty, error, out of stock) is designed, not left to default.
 4. Trust is visible: price, delivery, returns and security are never hidden or obscured.
 5. Source reconstruction and product improvement stay separate and documented.
