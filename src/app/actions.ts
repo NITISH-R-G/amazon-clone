@@ -36,6 +36,18 @@ export async function addToCartAction(_prev: FormState, formData: FormData): Pro
   redirect(`/cart?added=${encodeURIComponent(parsed.data.variantId)}${clamped ? "&clamped=1" : ""}`);
 }
 
+/** Adds one unit from a product card without leaving the page; the header count refreshes. */
+export async function quickAddAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = z.object({ variantId: z.string().min(1) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "This item is no longer available." };
+  const app = await getApp();
+  const actor = await ensureGuestActor(newToken);
+  const result = await app.cart.addItem(actor, parsed.data.variantId, 1);
+  if (!result.ok) return { error: cartMessages[result.error] ?? "Could not add this item." };
+  revalidatePath("/", "layout");
+  return { values: { added: "1" } };
+}
+
 const lineSchema = z.object({ lineId: z.string().min(1), quantity: z.coerce.number().optional() });
 
 export async function updateQuantityAction(formData: FormData): Promise<void> {

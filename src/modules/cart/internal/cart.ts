@@ -52,6 +52,8 @@ export function createCart({ db, catalog }: CartDeps) {
         title: variant.title,
         imageUrl: variant.imageUrl,
         unitPriceCents: variant.priceCents,
+        listPriceCents:
+          variant.listPriceCents !== null && variant.listPriceCents > variant.priceCents ? variant.listPriceCents : null,
         quantity: item.quantity,
         lineTotalCents: variant.priceCents * item.quantity,
         available: variant.stock >= item.quantity,

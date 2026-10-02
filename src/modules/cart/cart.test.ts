@@ -126,4 +126,16 @@ describe("cart", () => {
     expect(cart.lines).toHaveLength(1);
     expect(cart.lines[0].quantity).toBe(1);
   });
+
+  it("T35: a line carries the list price when the variant is on sale", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+    await app.cart.addItem(g1, "v-headphones", 1);
+    await app.cart.addItem(g1, "var-kettle", 1);
+
+    const [sale, regular] = (await app.cart.getCart(g1)).lines;
+
+    expect(sale).toMatchObject({ unitPriceCents: 12900, listPriceCents: 14900 });
+    expect(regular.listPriceCents).toBeNull();
+  });
 });
+

@@ -7,6 +7,8 @@ export type CartLine = {
   title: string;
   imageUrl: string | null;
   unitPriceCents: Cents;
+  /** Original price when the variant is on sale, otherwise null. */
+  listPriceCents: Cents | null;
   quantity: number;
   lineTotalCents: Cents;
   /** True when the variant can currently be bought in this quantity. */
