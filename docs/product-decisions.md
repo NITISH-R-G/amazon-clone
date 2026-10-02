@@ -235,6 +235,23 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Product page delivery estimate:** "Get it by ..." uses the same function as the order (`estimatedDeliveryFrom`), so the promise and the order always agree.
 - **Search ranking (explainable):** title words rank above brand, then description; a matching category name adds a little; ties go to featured rank, then review count. Misspellings are matched by trigram word similarity (threshold 0.5), only after an exact reading finds nothing.
 
+## D25. Product model: types, typed attributes and real variants
+
+- **Hierarchy:** department (category) -> product type -> product -> variants (SKUs). 43 types: 35 original plus 8 rich ones (smartphones, laptops, tablets, televisions, sofas, office chairs, running shoes, t-shirts), 9 departments, 104 invented brands.
+- **Attributes are data:** `product_types` and `attribute_defs` (role variation or spec, ordered vocabulary, facet flag); product values in `products.attributes` (jsonb, GIN index); variant choices in `variants.selections`. Adding a type adds rows, not tables or UI code. All faceted attributes are enumerated vocabularies.
+- **Variants are real:** each has a SKU, selections (up to three dimensions), price, stock and pictures (a colour changes the picture). Only valid combinations exist (8 GB RAM does not come in 1 TB). Resolution and "nearest valid variant" are pure and unit-tested (`catalog/variants.ts`).
+- **Identity is kept:** the cart stores the variant (and offer); the order snapshots SKU, option label and seller.
+- **Search:** department -> type -> the type's own attribute facets (counts ignore their own filter), plus attribute values in free-text search.
+- **All brands, sellers and products are invented**; no real trademarks.
+
+## D26. Offers: additive, with an implicit first-party offer
+
+- The variant's own price and stock **are** the first-party offer ("Sold by Cartly, fulfilled by Cartly"). The `offers` table holds additional seller offers only (about 600). Existing cart and checkout pricing is unchanged for first-party lines.
+- **Buy box rule:** the in-stock offer with the lowest landed price (price plus shipping); ties go to first-party; if nothing is in stock the page says so (`catalog/offers.ts`, pure).
+- A cart line stores `offer_id` (empty means first-party): the same variant from two sellers is two lines. Stock is taken from the offer. Seller lines add their own shipping; first-party lines keep the free-over-threshold rule.
+- **Seller handling time** delays the order's whole delivery timeline and the end of the cancel window (`orders.delivery_extra_minutes`); status is still one lifecycle per order.
+- Not built: seller pages, dashboards, ratings, per-line shipments.
+
 ## Review log
 
 | Date | Decision | Change |

@@ -9,7 +9,11 @@ Superseded the earlier "single container with a volume" plan (kept below as the 
 - **Credentials:** `DATABASE_URL` exists only in the Vercel project's environment. `.env.example` lists names only. The setup script prints error messages, never the connection string.
 - **Connection string:** use Neon's *pooled* string (pgbouncer, transaction mode). Checkout's `pg_advisory_xact_lock` is transaction-scoped and works through it. Pick the Neon region closest to the Vercel function region.
 
-### Verified locally against a real PostgreSQL 18 server
+### Verified locally against a real PostgreSQL 18 server (re-run after the Amazon-complexity work)
+
+After the attribute system, variants, structured facets and offers: all 13 migrations apply on PostgreSQL 18; `db:setup` seeds 2,400 products, 8,860 variants, 608 offers, 43 types and 104 brands in 2.4 s (re-run 0.7 s, idempotent), 24 MB; the full E2E suite (17 tests) passes against it. Production-build latency on that server: pages 20-45 ms, typo and fuzzy search about 80 ms, first request after start 0.39 s.
+
+Earlier verification (slice 1):
 
 `db:setup` applied all migrations and the seed, and re-running it changed nothing (idempotent). The full E2E suite (5 journeys x desktop and mobile) passed against that server, and the users, sessions and orders created by the tests were present in Postgres. A real Neon + Vercel run is still to be verified (see the gate in `docs/scale-up-plan.md`).
 

@@ -204,3 +204,16 @@ That totals roughly **23-28 hours** if nothing is cut; the cut order in section 
 4. **Deployment timing:** the database and hosting choice is independent of this plan (migrations apply on every deploy), so deploying the current build early to prove the pipeline would not conflict. You asked to stop before deployment, so I am not doing it; say when.
 
 **Not part of this plan:** Seller Central, seller dashboards or pages, millions of rows, queues, Redis, Elasticsearch, microservices, recommendation models, production payments, per-line shipments, returns, wishlists, dark mode.
+
+## 16. Outcome (core complexity slice built; deployment pending)
+
+| Slice | Result | Commit |
+|---|---|---|
+| A. Attribute system and variants | 43 types, typed attributes, SKUs, per-variant pictures, 8,860 variants (up to 3 dimensions), 104 brands; pure variant resolution (T59-T67) | `de385a8` |
+| B. Variants on the PDP | multi-dimension picker, price/SKU/availability/picture follow the variant, URL state, purchase options before details on mobile | `df5eb94` |
+| C. Cart and order identity | SKU and option label preserved cart -> order (T68) | `d1229e9` |
+| D. Structured facets | types, data-driven attribute facets, attribute text search (T69-T73) | `64d6317` |
+| E. Offers | sellers, offers, buy box, other sellers, per-offer cart/checkout/stock, delivery delay (T74-T80) | `bfef951` |
+| Reviews | **not started** (by decision: after deployment, if time allows) | |
+
+Checks: 79 unit/integration tests, 17 E2E (7 journeys on desktop and mobile; the sidebar journey is desktop-only), typecheck, lint, build and the Impeccable detector are clean. The whole stack, including all migrations and the seed, was exercised on a real PostgreSQL 18 server (E2E 17/17); Neon itself is still unverified. Estimated remaining before the deployment gate: deployment and QA only.
