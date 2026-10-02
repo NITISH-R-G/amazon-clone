@@ -8,6 +8,13 @@ function read(input: ParamInput, key: string): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+const MAX_BRANDS = 10;
+
+function readAll(input: ParamInput, key: string): string[] {
+  const raw = input instanceof URLSearchParams ? input.getAll(key) : [input[key] ?? []].flat();
+  return raw.map((v) => v.trim()).filter((v) => v.length > 0 && v.length <= 40).slice(0, MAX_BRANDS);
+}
+
 const wholeNumber = (v: string | undefined): number | undefined =>
   v !== undefined && /^\d{1,7}$/.test(v) ? Number(v) : undefined;
 
@@ -24,6 +31,7 @@ export function parseSearchParams(input: ParamInput): SearchQuery {
   return {
     text: text || undefined,
     categorySlug: category || undefined,
+    brands: readAll(input, "b").length > 0 ? [...new Set(readAll(input, "b"))] : undefined,
     minPriceCents: min === undefined ? undefined : min * 100,
     maxPriceCents: max === undefined ? undefined : max * 100,
     minRating: rating >= 1 && rating <= 5 ? rating : undefined,
@@ -39,6 +47,7 @@ export function toSearchParams(query: SearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.text) params.set("k", query.text);
   if (query.categorySlug) params.set("c", query.categorySlug);
+  for (const brand of query.brands ?? []) params.append("b", brand);
   if (query.minPriceCents !== undefined) params.set("min", String(Math.round(query.minPriceCents / 100)));
   if (query.maxPriceCents !== undefined) params.set("max", String(Math.round(query.maxPriceCents / 100)));
   if (query.minRating !== undefined) params.set("r", String(query.minRating));

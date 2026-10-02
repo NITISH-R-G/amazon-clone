@@ -8,6 +8,7 @@ export const SORT_KEYS: readonly SortKey[] = ["featured", "price-asc", "price-de
 export type SearchQuery = {
   text?: string;
   categorySlug?: string;
+  brands?: string[];
   minPriceCents?: Cents;
   maxPriceCents?: Cents;
   minRating?: number;
@@ -37,6 +38,7 @@ export type ProductSummary = {
 };
 
 export type CategoryFacet = { slug: string; name: string; count: number };
+export type BrandFacet = { name: string; count: number };
 
 export type SearchResult = {
   items: ProductSummary[];
@@ -46,7 +48,7 @@ export type SearchResult = {
   pageSize: number;
   /** True when no product matched every word, so products matching some of the words are shown. */
   relaxed: boolean;
-  facets: { categories: CategoryFacet[] };
+  facets: { categories: CategoryFacet[]; brands: BrandFacet[] };
 };
 
 export type Suggestion = { type: "product" | "category"; label: string; slug: string };

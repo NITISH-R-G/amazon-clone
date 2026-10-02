@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import * as schema from "@/db/schema";
 import type { Clock, IdGenerator } from "@/lib/ports";
+import { pgliteExtensions } from "@/lib/pglite";
 import type { PaymentProvider } from "@/modules/payments";
 import { createApp } from "@/server/app";
 import { fakePaymentProvider, fixedClock, fixedIds } from "./fakes";
@@ -22,7 +23,7 @@ type Overrides = {
  * fixtures. Only the three allowed ports may be overridden.
  */
 export async function createTestApp(overrides: Overrides = {}) {
-  const client = new PGlite();
+  const client = new PGlite({ extensions: pgliteExtensions });
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./drizzle" });
   await seedFixtures(db);

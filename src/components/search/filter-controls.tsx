@@ -9,6 +9,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
 type CategoryFacet = { slug: string; name: string; count: number };
+type BrandFacet = { name: string; count: number };
+
+const BRANDS_SHOWN = 6;
 
 const PRICE_BUCKETS = [
   { key: "any", label: "Any price" },
@@ -28,7 +31,15 @@ function priceKeyOf(params: URLSearchParams): string {
  * Filters for the results page. State lives in the URL: every change navigates (page resets to 1),
  * so results are shareable and the back button works.
  */
-export function FilterControls({ categories, onNavigate }: { categories: CategoryFacet[]; onNavigate?: () => void }) {
+export function FilterControls({
+  categories,
+  brands,
+  onNavigate,
+}: {
+  categories: CategoryFacet[];
+  brands: BrandFacet[];
+  onNavigate?: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -49,6 +60,39 @@ export function FilterControls({ categories, onNavigate }: { categories: Categor
       router.push(hrefWith(changes), { scroll: false });
       onNavigate?.();
     });
+
+  const selectedBrands = params.getAll("b");
+  const toggleBrand = (name: string, checked: boolean) =>
+    startTransition(() => {
+      const next = new URLSearchParams(params.toString());
+      next.delete("b");
+      const updated = checked ? [...selectedBrands, name] : selectedBrands.filter((b) => b !== name);
+      for (const b of updated) next.append("b", b);
+      next.delete("page");
+      const qs = next.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      onNavigate?.();
+    });
+  // A selected brand stays listed even when the other filters leave it with no products.
+  const listed: BrandFacet[] = [
+    ...brands,
+    ...selectedBrands.filter((s) => !brands.some((b) => b.name === s)).map((name) => ({ name, count: 0 })),
+  ];
+  // Selected brands first, so a choice is never hidden behind "Show all brands".
+  const brandRows = [...listed.filter((b) => selectedBrands.includes(b.name)), ...listed.filter((b) => !selectedBrands.includes(b.name))];
+  const brandRow = (b: BrandFacet) => (
+    <div key={b.name} className={rowClass}>
+      <Checkbox
+        id={`brand-${b.name}`}
+        checked={selectedBrands.includes(b.name)}
+        onCheckedChange={(checked) => toggleBrand(b.name, checked === true)}
+      />
+      <Label htmlFor={`brand-${b.name}`} className="min-h-11 flex-1 cursor-pointer justify-between text-sm font-normal lg:min-h-9">
+        <span>{b.name}</span>
+        <span className="num text-xs text-muted-foreground">{b.count}</span>
+      </Label>
+    </div>
+  );
 
   const currentCategory = params.get("c");
   const priceKey = priceKeyOf(params);
@@ -86,6 +130,24 @@ export function FilterControls({ categories, onNavigate }: { categories: Categor
           ))}
         </ul>
       </section>
+
+      {brandRows.length > 0 ? (
+        <section aria-labelledby="f-brand" className="space-y-1">
+          <h2 id="f-brand" className="mb-1 text-sm font-semibold">
+            Brand
+          </h2>
+          {brandRows.slice(0, BRANDS_SHOWN).map(brandRow)}
+          {brandRows.length > BRANDS_SHOWN ? (
+            <details className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm text-muted-foreground hover:text-foreground lg:min-h-9">
+                <span className="group-open:hidden">Show all brands</span>
+                <span className="hidden group-open:inline">Show fewer</span>
+              </summary>
+              {brandRows.slice(BRANDS_SHOWN).map(brandRow)}
+            </details>
+          ) : null}
+        </section>
+      ) : null}
 
       <section aria-labelledby="f-price" className="space-y-1">
         <h2 id="f-price" className="mb-1 text-sm font-semibold">

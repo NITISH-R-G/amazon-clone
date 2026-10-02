@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { products, variants } from "@/db/schema";
 import { parseSearchParams, toSearchParams } from "@/modules/search";
 import { createTestApp } from "@/test-support/app";
 
@@ -162,5 +163,59 @@ describe("search", () => {
     // One matching word out of four is coincidence, not a partial match.
     const weak = await app.search.searchProducts({ text: "zzzz blanket qqqq wwww" });
     expect(weak).toMatchObject({ total: 0, relaxed: false });
+  });
+  it("T52: a word in the title ranks above the same word only in the description", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+    await app.db.insert(products).values({
+      id: "p-organiser",
+      slug: "cord-organiser",
+      title: "Cord Organiser",
+      brand: "Veld",
+      description: "Keeps the cord of a kettle tidy on the counter.",
+      images: [{ url: "/p/o.svg", alt: "Organiser" }],
+      categoryId: "cat-home",
+      ratingTenths: 50,
+      ratingCount: 9000,
+    });
+    await app.db.insert(variants).values({ id: "v-organiser", productId: "p-organiser", priceCents: 900, stock: 4 });
+
+    const result = await app.search.searchProducts({ text: "kettle" });
+    // Both kettles have the word in the title; the organiser only in its description, however popular it is.
+    expect(slugs(result).slice(0, 2).sort()).toEqual(["ceramic-kettle-pro", "test-kettle"]);
+    expect(slugs(result)[2]).toBe("cord-organiser");
+  });
+
+  it("T53: brand filter and brand facets respect the other filters but not the brand filter itself", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+
+    const all = await app.search.searchProducts({});
+    expect(all.facets.brands).toEqual([
+      { name: "Orrin", count: 2 },
+      { name: "Testco", count: 2 },
+      { name: "Veld", count: 2 },
+      { name: "Kestrel", count: 1 },
+    ]);
+
+    expect(slugs(await app.search.searchProducts({ brands: ["Orrin"] }))).toEqual(["studio-headphones", "pocket-speaker"]);
+    expect((await app.search.searchProducts({ brands: ["Orrin", "Kestrel"] })).total).toBe(3);
+
+    const inAudio = await app.search.searchProducts({ categorySlug: "audio", brands: ["Veld"] });
+    expect(inAudio.total).toBe(0);
+    expect(inAudio.facets.brands).toEqual([{ name: "Orrin", count: 2 }]); // brand facet ignores the brand filter
+    const orrin = await app.search.searchProducts({ brands: ["Orrin"] });
+    expect(orrin.facets.categories).toEqual([{ slug: "audio", name: "Audio", count: 2 }]); // category facet respects it
+  });
+
+  it("T54: odd, empty and hostile queries never throw and never match by accident", async () => {
+    const app = await createTestApp({ searchFixtures: true });
+    const hostile = ["!!!", "()", "a:b|c&d", "'; drop table products; --", "\\", "%", " ", "x".repeat(5000), "the and of", "   ", "kettle'--"];
+    for (const text of hostile) {
+      const result = await app.search.searchProducts({ text });
+      expect(result.total, JSON.stringify(text.slice(0, 20))).toBeGreaterThanOrEqual(0);
+    }
+    expect((await app.search.searchProducts({ text: "%" })).total).toBe(0);
+    expect((await app.search.searchProducts({ text: "x".repeat(5000) })).total).toBe(0);
+    expect(slugs(await app.search.searchProducts({ text: "pocket speakers" }))).toEqual(["pocket-speaker"]); // plural
+    expect(slugs(await app.search.searchProducts({ text: "blue" }))).toEqual(["pocket-speaker"]); // prefix of "Bluetooth"
   });
 });

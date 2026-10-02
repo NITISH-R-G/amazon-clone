@@ -41,3 +41,42 @@ export type VariantDetail = Variant & {
   title: string;
   imageUrl: string | null;
 };
+
+export type ProductSort = "relevance" | "featured" | "price-asc" | "price-desc" | "rating" | "newest";
+
+/**
+ * Text to match. `tokens` are lower-case letters and digits only (the caller normalises).
+ * `all`: every word is the start of a word in the product (or of its category name);
+ * `fuzzy`: like `all`, but a word may also be a close misspelling of a title or brand word;
+ * `partial`: as `all` (no misspellings), but only half of the words (rounded up) have to match.
+ */
+export type TextMatch = { tokens: string[]; mode: "all" | "fuzzy" | "partial"; includeCategoryName?: boolean };
+
+export type ProductCriteria = {
+  text?: TextMatch;
+  categorySlug?: string;
+  brands?: string[];
+  minPriceCents?: Cents;
+  maxPriceCents?: Cents;
+  minRating?: number;
+  inStockOnly?: boolean;
+  onSale?: boolean;
+  sort: ProductSort;
+  /** 1-based; clamped to the last page. */
+  page: number;
+  pageSize: number;
+  /** Default true. Probing queries that only need to know whether anything matches can skip the facet counts. */
+  withFacets?: boolean;
+};
+
+export type CategoryCount = { slug: string; name: string; count: number };
+export type BrandCount = { name: string; count: number };
+
+export type ProductPage = {
+  products: Product[];
+  total: number;
+  /** The page actually returned (after clamping). */
+  page: number;
+  /** Counts that ignore their own filter, so a facet shows what choosing it would give. */
+  facets: { categories: CategoryCount[]; brands: BrandCount[] };
+};

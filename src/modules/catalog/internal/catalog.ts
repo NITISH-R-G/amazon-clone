@@ -3,6 +3,7 @@ import type { DbOrTx } from "@/lib/db";
 import { err, ok, type Result } from "@/lib/result";
 import { categories, products, variants } from "../schema";
 import type { AvailabilityState, Category, Product, VariantDetail } from "../types";
+import { createFind } from "./find";
 
 /** Out of stock at 0, low stock from 1 to 5, otherwise in stock. */
 export function availabilityState(stock: number): AvailabilityState {
@@ -27,6 +28,9 @@ class OutOfStockSignal extends Error {
 
 export function createCatalog({ db }: CatalogDeps) {
   return {
+    /** Filtered, searched, sorted and paginated products with facet counts (see ./find.ts). */
+    findProducts: createFind({ db }),
+
     async getProduct(slug: string, tx?: DbOrTx): Promise<Product | null> {
       const d = tx ?? db;
       const [product] = await d.select().from(products).where(eq(products.slug, slug)).limit(1);

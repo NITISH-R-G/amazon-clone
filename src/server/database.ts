@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import * as schema from "@/db/schema";
+import { pgliteExtensions } from "@/lib/pglite";
 import type { Database } from "./app";
 
 export type Driver = "postgres" | "pglite";
@@ -49,7 +50,7 @@ export async function openDatabase(env: Env = process.env): Promise<DatabaseHand
   // `memory://` (used by E2E) gives a fresh database per server start.
   const dir = env.PGLITE_DIR ?? "data/pglite";
   if (!dir.startsWith("memory://")) mkdirSync(dir, { recursive: true });
-  const client = new PGlite(dir);
+  const client = new PGlite(dir, { extensions: pgliteExtensions });
   const db = drizzle(client, { schema });
   return {
     db,

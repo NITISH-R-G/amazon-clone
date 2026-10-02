@@ -53,7 +53,7 @@ async function signOut(page: Page, info: TestInfo) {
   await expect(page).toHaveURL(/\/$/);
 }
 
-test("discovery: home to search to a product, with recovery from a typo and from no results", async ({ page }) => {
+test("discovery: home to search to a product, with recovery from a typo and from no results", async ({ page }, info) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
@@ -62,9 +62,21 @@ test("discovery: home to search to a product, with recovery from a typo and from
   await search.press("Enter");
   await expect(page).toHaveURL(/\/s\?.*k=kettle/);
   await expect(page.getByRole("heading", { level: 1, name: /Results for/ })).toBeVisible();
-  await page.getByRole("link", { name: /Ceramic Gooseneck Kettle|Ceramic Kettle/ }).first().click();
+  await page.locator('main a[href^="/dp/"]').filter({ hasText: /kettle/i }).first().click();
   await expect(page).toHaveURL(/\/dp\//);
   await expect(page.getByRole("button", { name: "Add to cart" })).toBeVisible();
+
+  // Narrowing a big department: brand filter shows counts, applies from the URL and can be removed.
+  await page.goto("/s?c=audio");
+  await expect(page.getByRole("heading", { level: 1, name: "Audio" })).toBeVisible();
+  const brandFilters = isMobile(info) ? undefined : page.getByRole("complementary", { name: "Filters" });
+  if (brandFilters) {
+    await brandFilters.getByText("Orrin").first().click();
+    await expect(page).toHaveURL(/b=Orrin/);
+    await expect(page.getByRole("list", { name: "Applied filters" }).getByText("Orrin")).toBeVisible();
+    await page.getByRole("list", { name: "Applied filters" }).getByRole("link", { name: /Orrin/ }).click();
+    await expect(page).not.toHaveURL(/b=/);
+  }
 
   // A misspelled query still finds products.
   await page.goto("/s?k=wireles%20headphnes");

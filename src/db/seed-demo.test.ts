@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
+import { pgliteExtensions } from "@/lib/pglite";
 import { createSystemIds, systemClock } from "@/lib/ports";
 import { createDemoProvider } from "@/modules/payments";
 import { createApp } from "@/server/app";
@@ -12,7 +13,7 @@ import { seedDemoCatalog } from "./seed-demo";
 
 describe("demo catalogue", () => {
   it("T34: seeds once, is searchable, and every product is purchasable data", async () => {
-    const client = new PGlite();
+    const client = new PGlite({ extensions: pgliteExtensions });
     const db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder: "./drizzle" });
     await seedDemoCatalog(db);
@@ -37,6 +38,14 @@ describe("demo catalogue", () => {
       // Products with several variants must name the option they differ by.
       if (p.variants.length > 1) expect(p.optionName, p.slug).not.toBeNull();
     }
+
+    // Search over the real catalogue: nonsense and very common words must not turn into matches.
+    for (const text of ["something-that-does-not-exist", "this is not a product", "qwertyuiop asdfghjkl"]) {
+      expect((await app.search.searchProducts({ text })).total, text).toBe(0);
+    }
+    expect((await app.search.searchProducts({ text: "wireless headphones" })).total).toBeGreaterThan(10);
+    expect((await app.search.searchProducts({ text: "wireles headphnes" })).total).toBeGreaterThan(10); // typos
+    expect((await app.search.suggest("wirel")).length).toBeGreaterThan(0);
     await client.close();
   });
 });

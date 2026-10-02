@@ -27,6 +27,7 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
   const heading = query.text ? `Results for "${query.text}"` : (categoryName ?? (query.onSale ? "On sale" : "All products"));
   const activeCount = [
     query.categorySlug,
+    query.brands && query.brands.length > 0,
     query.minPriceCents !== undefined || query.maxPriceCents !== undefined,
     query.minRating,
     query.inStockOnly,
@@ -46,7 +47,7 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           </p>
         </div>
         <div className="flex w-full items-center gap-3 sm:w-auto">
-          {showFilters ? <MobileFilters categories={result.facets.categories} total={result.total} activeCount={activeCount} /> : null}
+          {showFilters ? <MobileFilters categories={result.facets.categories} brands={result.facets.brands} total={result.total} activeCount={activeCount} /> : null}
           <SortControl value={query.sort} />
         </div>
       </div>
@@ -56,7 +57,7 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
       <div className={showFilters ? "grid gap-10 lg:grid-cols-[13.5rem_minmax(0,1fr)]" : ""}>
         {showFilters ? (
           <aside aria-label="Filters" className="hidden lg:block">
-            <FilterControls categories={result.facets.categories} />
+            <FilterControls categories={result.facets.categories} brands={result.facets.brands} />
           </aside>
         ) : null}
         <div>

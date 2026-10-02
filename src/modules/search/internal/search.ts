@@ -1,9 +1,33 @@
-import { availabilityState, type Catalog, type Category, type Product } from "@/modules/catalog";
-import type { CategoryFacet, ProductSummary, SearchQuery, SearchResult, Suggestion } from "../types";
+import {
+  availabilityState,
+  type Catalog,
+  type Product,
+  type ProductCriteria,
+  type ProductPage,
+  type ProductSort,
+  type TextMatch,
+} from "@/modules/catalog";
+import type { ProductSummary, SearchQuery, SearchResult, Suggestion } from "../types";
 
 export const DEFAULT_PAGE_SIZE = 12;
 
-export type SearchDeps = { catalog: Pick<Catalog, "listProducts" | "listCategories"> };
+export type SearchDeps = { catalog: Pick<Catalog, "findProducts" | "listCategories"> };
+
+// Very common words carry no meaning for finding a product and match descriptions by accident.
+const FILLER = new Set(
+  (
+    "a an and or the of for with in to on at by as is are was were be been it its this that these those " +
+    "do does did not no so but if any all from your you my we i have has had can will just"
+  ).split(" "),
+);
+const wordsOf = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/** The words that carry meaning; if the query is only filler, keep it as typed. Bounded so a huge query stays cheap. */
+function queryTokens(text: string): string[] {
+  const all = wordsOf(text);
+  const meaningful = all.filter((w) => !FILLER.has(w));
+  return (meaningful.length > 0 ? meaningful : all).slice(0, 8).map((w) => w.slice(0, 32));
+}
 
 function summarise(product: Product, categoryName: string | null): ProductSummary {
   const cheapest = product.variants.reduce((a, b) => (b.priceCents < a.priceCents ? b : a), product.variants[0]);
@@ -28,139 +52,87 @@ function summarise(product: Product, categoryName: string | null): ProductSummar
   };
 }
 
-const FILLER = new Set(["a", "an", "and", "or", "the", "of", "for", "with", "in", "to"]);
-const wordsOf = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-
-/** The words that carry meaning; if the query is only filler, keep it as typed. */
-function queryTokens(text: string): string[] {
-  const all = wordsOf(text);
-  const meaningful = all.filter((w) => !FILLER.has(w));
-  return meaningful.length > 0 ? meaningful : all;
-}
-
-/** True when `a` and `b` differ by at most `max` insertions, deletions or substitutions. */
-function withinEdits(a: string, b: string, max: number): boolean {
-  if (Math.abs(a.length - b.length) > max) return false;
-  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const row = [i];
-    for (let j = 1; j <= b.length; j++) {
-      row[j] = Math.min(previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    previous = row;
-  }
-  return previous[b.length] <= max;
-}
-
-/** Substring match, or (for words of 4+ letters) a close spelling of a word in the product text. */
-function tokenMatches(token: string, haystack: string, haystackWords: string[]): boolean {
-  if (haystack.includes(token)) return true;
-  if (token.length < 4) return false;
-  const allowed = token.length >= 8 ? 2 : 1;
-  return haystackWords.some((w) => withinEdits(token, w, allowed));
-}
-
-/** `any` means at least half of the words (rounded up): one stray match is coincidence, not relevance. */
-type TextMode = "all" | "any";
-
-const byTitle = (a: Product, b: Product) => a.title.localeCompare(b.title);
-const minPrice = (p: Product) => Math.min(...p.variants.map((v) => v.priceCents));
-
-const sorters: Record<SearchQuery["sort"], (a: Product, b: Product) => number> = {
-  featured: (a, b) =>
-    (a.featuredRank ?? Number.MAX_SAFE_INTEGER) - (b.featuredRank ?? Number.MAX_SAFE_INTEGER) || byTitle(a, b),
-  "price-asc": (a, b) => minPrice(a) - minPrice(b) || byTitle(a, b),
-  "price-desc": (a, b) => minPrice(b) - minPrice(a) || byTitle(a, b),
-  rating: (a, b) => b.rating - a.rating || b.ratingCount - a.ratingCount || byTitle(a, b),
-  newest: (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byTitle(a, b),
-};
+const EMPTY_FACETS = { categories: [], brands: [] };
 
 export function createSearch({ catalog }: SearchDeps) {
-  async function load() {
-    const [products, categories] = await Promise.all([catalog.listProducts(), catalog.listCategories()]);
-    const byId = new Map(categories.map((c) => [c.id, c]));
-    return { products, categories, byId };
-  }
-
-  function matches(
-    p: Product,
-    q: SearchQuery,
-    category: Category | undefined,
-    mode: TextMode,
-    ignoreCategory = false,
-  ): boolean {
-    const tokens = q.text ? queryTokens(q.text) : [];
-    if (tokens.length > 0) {
-      const haystack = `${p.title} ${p.brand} ${category?.name ?? ""} ${p.description}`.toLowerCase();
-      const words = wordsOf(haystack);
-      const hits = tokens.filter((t) => tokenMatches(t, haystack, words)).length;
-      if (hits < (mode === "all" ? tokens.length : Math.ceil(tokens.length / 2))) return false;
+  /**
+   * Try progressively looser readings of the text and stop at the first that finds anything:
+   * every word as a word-start; then the same allowing close misspellings; then half of the words.
+   */
+  async function run(query: SearchQuery, base: Omit<ProductCriteria, "text">, tokens: string[]) {
+    if (tokens.length === 0) return { found: await catalog.findProducts(base), relaxed: false };
+    const modes: TextMatch["mode"][] = tokens.length > 1 ? ["all", "fuzzy", "partial"] : ["all", "fuzzy"];
+    let last: ProductPage | null = null;
+    for (const [i, mode] of modes.entries()) {
+      // Looser readings only probe (no facet counts) until one of them finds something.
+      const probing = i > 0;
+      last = await catalog.findProducts({ ...base, text: { tokens, mode }, withFacets: !probing });
+      if (last.total > 0) {
+        if (probing) last = await catalog.findProducts({ ...base, text: { tokens, mode } });
+        return { found: last, relaxed: mode === "partial" };
+      }
     }
-    if (!ignoreCategory && q.categorySlug && category?.slug !== q.categorySlug) return false;
-    const price = minPrice(p);
-    if (q.minPriceCents !== undefined && price < q.minPriceCents) return false;
-    if (q.maxPriceCents !== undefined && price > q.maxPriceCents) return false;
-    if (q.minRating !== undefined && p.rating < q.minRating) return false;
-    if (q.inStockOnly && !p.variants.some((v) => v.stock > 0)) return false;
-    if (q.onSale && !p.variants.some((v) => v.listPriceCents !== null && v.listPriceCents > v.priceCents)) return false;
-    return true;
+    return { found: last as ProductPage, relaxed: false };
   }
 
   /** `sort` and `page` are optional here; callers parsing a URL always get them from `parseSearchParams`. */
   async function searchProducts(input: Partial<SearchQuery>): Promise<SearchResult> {
     const query: SearchQuery = { ...input, sort: input.sort ?? "featured", page: input.page ?? 1 };
-    const { products, categories, byId } = await load();
-    const catOf = (p: Product) => (p.categoryId ? byId.get(p.categoryId) : undefined);
-
-    const tokenCount = query.text ? queryTokens(query.text).length : 0;
-    let mode: TextMode = "all";
-    let matched = products.filter((p) => matches(p, query, catOf(p), mode));
-    // Nothing has every word: show products with some of them, and say so.
-    if (matched.length === 0 && tokenCount >= 2) {
-      const partial = products.filter((p) => matches(p, query, catOf(p), "any"));
-      if (partial.length > 0) {
-        mode = "any";
-        matched = partial;
-      }
-    }
-    matched = matched.sort(sorters[query.sort]);
-
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
-    const pageCount = Math.max(1, Math.ceil(matched.length / pageSize));
-    const page = Math.min(Math.max(1, query.page), pageCount);
-    const items = matched
-      .slice((page - 1) * pageSize, page * pageSize)
-      .map((p) => summarise(p, catOf(p)?.name ?? null));
+    const hasText = Boolean(query.text);
+    const tokens = hasText ? queryTokens(query.text as string) : [];
+    if (hasText && tokens.length === 0) {
+      // Only symbols (for example "%" or "!!!"): nothing can match, and it must not match everything.
+      return { items: [], total: 0, page: 1, pageCount: 1, pageSize, relaxed: false, facets: EMPTY_FACETS };
+    }
 
-    const withoutCategory = products.filter((p) => matches(p, query, catOf(p), mode, true));
-    const facetCategories: CategoryFacet[] = categories
-      .map((c) => ({ slug: c.slug, name: c.name, count: withoutCategory.filter((p) => p.categoryId === c.id).length }))
-      .filter((f) => f.count > 0);
+    const sort: ProductSort = query.sort === "featured" && tokens.length > 0 ? "relevance" : query.sort;
+    const { found, relaxed } = await run(
+      query,
+      {
+        categorySlug: query.categorySlug,
+        brands: query.brands,
+        minPriceCents: query.minPriceCents,
+        maxPriceCents: query.maxPriceCents,
+        minRating: query.minRating,
+        inStockOnly: query.inStockOnly,
+        onSale: query.onSale,
+        sort,
+        page: query.page,
+        pageSize,
+      },
+      tokens,
+    );
 
+    const categories = await catalog.listCategories();
+    const nameById = new Map(categories.map((c) => [c.id, c.name]));
     return {
-      items,
-      total: matched.length,
-      page,
-      pageCount,
+      items: found.products.map((p) => summarise(p, p.categoryId ? (nameById.get(p.categoryId) ?? null) : null)),
+      total: found.total,
+      page: found.page,
+      pageCount: Math.max(1, Math.ceil(found.total / pageSize)),
       pageSize,
-      relaxed: mode === "any",
-      facets: { categories: facetCategories },
+      relaxed,
+      facets: found.facets,
     };
   }
 
-  /** Short list for the search box: product titles first (title prefix, then any word prefix), then categories. */
+  /** Short list for the search box: products whose words start with the text, then matching categories. */
   async function suggest(text: string, limit = 8): Promise<Suggestion[]> {
+    const tokens = queryTokens(text.trim());
+    if (tokens.length === 0) return [];
+    const [found, categories] = await Promise.all([
+      catalog.findProducts({
+        text: { tokens, mode: "all", includeCategoryName: false },
+        sort: "relevance",
+        page: 1,
+        pageSize: limit,
+      }),
+      catalog.listCategories(),
+    ]);
     const q = text.trim().toLowerCase();
-    if (!q) return [];
-    const { products, categories } = await load();
     const startsWithWord = (label: string) => label.toLowerCase().split(/\s+/).some((w) => w.startsWith(q));
-    const titleStarts = products.filter((p) => p.title.toLowerCase().startsWith(q));
-    const wordStarts = products.filter((p) => !p.title.toLowerCase().startsWith(q) && startsWithWord(p.title));
-    const productHits: Suggestion[] = [...titleStarts.sort(byTitle), ...wordStarts.sort(byTitle)].map((p) => ({
-      type: "product",
-      label: p.title,
-      slug: p.slug,
-    }));
+    const productHits: Suggestion[] = found.products.map((p) => ({ type: "product", label: p.title, slug: p.slug }));
     const categoryHits: Suggestion[] = categories
       .filter((c) => startsWithWord(c.name))
       .map((c) => ({ type: "category", label: c.name, slug: c.slug }));

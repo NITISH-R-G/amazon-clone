@@ -9,6 +9,9 @@ export function AppliedFilters({ query, categoryName }: { query: SearchQuery; ca
   const chips: Chip[] = [];
   if (query.text) chips.push({ label: `"${query.text}"`, clear: { text: undefined } });
   if (query.categorySlug) chips.push({ label: categoryName ?? query.categorySlug, clear: { categorySlug: undefined } });
+  for (const brand of query.brands ?? []) {
+    chips.push({ label: brand, clear: { brands: (query.brands ?? []).filter((b) => b !== brand) } });
+  }
   if (query.minPriceCents !== undefined || query.maxPriceCents !== undefined) {
     const lo = query.minPriceCents !== undefined ? `$${query.minPriceCents / 100}` : null;
     const hi = query.maxPriceCents !== undefined ? `$${query.maxPriceCents / 100}` : null;
