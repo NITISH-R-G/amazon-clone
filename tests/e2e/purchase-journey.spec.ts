@@ -253,7 +253,7 @@ test("lifecycle: a new order can be cancelled before it ships", async ({ page },
   await page.getByRole("button", { name: "Cancel order" }).click();
 
   await expect(page.getByRole("heading", { level: 2, name: "Cancelled" })).toBeVisible();
-  await expect(page.getByText(/nothing was charged/i)).toBeVisible();
+  await expect(page.getByText(/payment has been refunded/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancel order" })).toHaveCount(0);
   await expect(page.getByText("Order cancelled")).toBeVisible(); // timeline
 });
