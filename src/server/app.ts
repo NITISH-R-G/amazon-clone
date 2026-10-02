@@ -1,4 +1,4 @@
-import type { PgliteDatabase } from "drizzle-orm/pglite";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import type * as schema from "@/db/schema";
 import type { Clock, IdGenerator } from "@/lib/ports";
 import { createCart } from "@/modules/cart";
@@ -7,7 +7,12 @@ import { createCheckout } from "@/modules/checkout";
 import { createOrders } from "@/modules/orders";
 import type { PaymentProvider } from "@/modules/payments";
 
-export type Database = PgliteDatabase<typeof schema>;
+/**
+ * Driver-agnostic Postgres database. PGlite (local/test) and a production driver
+ * (e.g. node-postgres or Neon) both satisfy it; only `runtime.ts` and
+ * `test-support/app.ts` know which driver is in use.
+ */
+export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 export type AppDeps = {
   db: Database;
