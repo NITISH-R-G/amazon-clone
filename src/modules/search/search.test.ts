@@ -158,5 +158,9 @@ describe("search", () => {
     const app = await createTestApp({ searchFixtures: true });
     const none = await app.search.searchProducts({ text: "something-that-does-not-exist" });
     expect(none).toMatchObject({ total: 0, relaxed: false });
+
+    // One matching word out of four is coincidence, not a partial match.
+    const weak = await app.search.searchProducts({ text: "zzzz blanket qqqq wwww" });
+    expect(weak).toMatchObject({ total: 0, relaxed: false });
   });
 });

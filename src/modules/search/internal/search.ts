@@ -60,6 +60,7 @@ function tokenMatches(token: string, haystack: string, haystackWords: string[]):
   return haystackWords.some((w) => withinEdits(token, w, allowed));
 }
 
+/** `any` means at least half of the words (rounded up): one stray match is coincidence, not relevance. */
 type TextMode = "all" | "any";
 
 const byTitle = (a: Product, b: Product) => a.title.localeCompare(b.title);
@@ -92,8 +93,8 @@ export function createSearch({ catalog }: SearchDeps) {
     if (tokens.length > 0) {
       const haystack = `${p.title} ${p.brand} ${category?.name ?? ""} ${p.description}`.toLowerCase();
       const words = wordsOf(haystack);
-      const hit = (t: string) => tokenMatches(t, haystack, words);
-      if (!(mode === "all" ? tokens.every(hit) : tokens.some(hit))) return false;
+      const hits = tokens.filter((t) => tokenMatches(t, haystack, words)).length;
+      if (hits < (mode === "all" ? tokens.length : Math.ceil(tokens.length / 2))) return false;
     }
     if (!ignoreCategory && q.categorySlug && category?.slug !== q.categorySlug) return false;
     const price = minPrice(p);
