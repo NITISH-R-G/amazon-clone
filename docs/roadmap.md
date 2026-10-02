@@ -40,6 +40,32 @@ Cut line: if time runs short, A2 shrinks to ~20 products and A3 drops rating fil
 | B5 | Responsive shell: mobile header, menu sheet, scrolling sub-nav, footer | Works on phones | A0; source: mobile captures (P1 request) | Browser checklist mobile/tablet green | M | manual checklist |
 | B6 | Deploy (Vercel + hosted DB + env + seed) | Live URL | all above | Public URL completes the purchase journey | M | tier-1 journey against production |
 
+## Next implementation order (approved after the Phase 1 review)
+
+The tracer (A1) is accepted as the foundation. Domain behaviour is preserved; only the visual layer is revised once Site Peel evidence arrives. Nothing below is started.
+
+**P0-A**
+1. Site Peel-informed visual system (tokens, shell, component refinement)
+2. Home
+3. Search
+4. Search results
+5. PDP refinement
+6. Cart refinement
+7. Checkout refinement
+8. Confirmation refinement
+
+**P0-B**
+9. Authentication
+10. Guest-cart merge
+11. Orders
+12. Account
+13. Address book
+14. Loading/empty/error system
+15. Responsive refinement
+16. Deployment (includes the production database decision, `docs/architecture.md` section 12)
+
+Gates: items 1 and 3 to 8 depend on the Site Peel captures; items 2 to 4 also depend on the catalogue decision (`docs/catalogue-decision.md`). Slice IDs A2 to A7 and B1 to B6 above map onto this order.
+
 ## P1: Differentiation (only after P0-A and P0-B are green)
 
 | ID | Item | Value | Cx | Notes |

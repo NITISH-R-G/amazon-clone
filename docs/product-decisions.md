@@ -32,6 +32,7 @@ Evidence references are to `docs/recon/` (page-map, component-inventory, flow-ma
 | D16 | Provisional tracer layouts | Our own design, no source | None | A1 |
 | D17 | Checkout form behaviour | Improvement (additive) | Our own manual run | A1 |
 | D18 | Visual identity (tracer) | Constraint + our own | Observed tokens | A1 |
+| D19 | Visual baseline provisional | Process decision | None | A1 |
 
 ---
 
@@ -181,6 +182,15 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Reason**: familiar affordances reduce learning cost; own marks avoid trademark and copyright exposure.
 - **Tradeoff**: the typeface is generic; revisit in the P1 Impeccable pass.
 - **Validation method**: Impeccable detector on the rendered pages (structural findings: none); user decisions still open on logo and font.
+
+## D19. Visual baseline is provisional until Site Peel evidence arrives
+
+- **Observed evidence**: none for the PDP, cart and checkout. The five required captures (PDP simple, search results, cart with 2 to 3 items, checkout review, sign-in step 2) are not in `recon-v2/` yet.
+- **Problem/opportunity**: the tracer UI had to exist to prove the purchase path; polishing it before evidence arrives would be wasted work and could entrench invented structure.
+- **Decision**: the current PDP, cart, checkout and confirmation visual structure is **provisional**. The visual system will be revisited after the captures arrive. Domain behaviour (the eight modules, tests T1 to T22) is independent of that revision and is not rewritten for it. No Impeccable audit or polish is run on the placeholder UI.
+- **Reason**: evidence first; the module layer confines the cost of a visual revision to `src/app` and `src/components`.
+- **Tradeoff**: until then the UI is functional but not faithful to Amazon, and the generic typeface and placeholder wordmark remain.
+- **Validation method**: when the captures arrive, map their structure to existing components and routes, record what changed in D4, D5 and D6, and re-run the tier-1 E2E unchanged.
 
 ## Review log
 

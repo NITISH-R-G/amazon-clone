@@ -37,7 +37,7 @@ A faithful but clearer take on the Amazon flow: it keeps Amazon's recognisable s
 - Account area: overview, orders, addresses, sign-in. Help/returns surfaces are secondary.
 - Payments are simulated; no real money moves. No Amazon backend, tracking, ads or personalisation machinery is reproduced.
 - Amazon's proprietary font (Amazon Ember) is not available and not licensed for reuse; a substitute is required.
-- Product catalogue, data and imagery for the demo are not yet decided (see `docs/roadmap.md`, open questions).
+- Product catalogue, data and imagery for the demo are not yet decided (see `docs/catalogue-decision.md`).
 - UNKNOWN / REQUIRES VALIDATION: exact scope of cancellations, tracking, save-for-later and the deals/returns/help depth.
 
 ## Brand Commitments

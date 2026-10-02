@@ -20,7 +20,7 @@ Package manager: `pnpm`. No app is scaffolded yet (Phase 0); standard `pnpm dev|
 - Module contracts and dependency rules: `docs/modules.md`; stack, data, auth, payments: `docs/architecture.md`
 - First build and its test contract: `docs/tracer-bullet.md`
 - Tests and browser verification: `docs/testing-strategy.md`
-- Scope and order of work: `docs/roadmap.md`
+- Scope and order of work: `docs/roadmap.md`; open catalogue questions: `docs/catalogue-decision.md`
 - Why we differ from Amazon: `docs/product-decisions.md`
 - What Amazon source we have: `docs/recon/README.md`; what we still need: `docs/recon/site-peel-request.md`
 - Design context for Impeccable: `PRODUCT.md`
