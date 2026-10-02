@@ -1,0 +1,10 @@
+node_modules
+.next
+data
+test-results
+playwright-report
+recon
+recon-v2
+.agent-logs
+.git
+.env*
