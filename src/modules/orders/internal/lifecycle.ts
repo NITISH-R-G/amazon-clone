@@ -9,6 +9,9 @@ export const DELIVERED_AFTER_MS = 120 * MIN;
 /** An order can be cancelled until it ships. */
 export const CANCEL_WINDOW_MS = SHIPPED_AFTER_MS;
 
+/** When an order placed at `from` is expected to arrive (also shown on product pages before buying). */
+export const estimatedDeliveryFrom = (from: Date): Date => new Date(from.getTime() + DELIVERED_AFTER_MS);
+
 type Lifecycle = {
   status: OrderStatus;
   cancellable: boolean;
@@ -43,7 +46,7 @@ export function lifecycleOf(placedAt: Date, cancelledAt: Date | null, now: Date)
   return {
     status,
     cancellable: elapsed < CANCEL_WINDOW_MS,
-    estimatedDelivery: new Date(placed + DELIVERED_AFTER_MS),
+    estimatedDelivery: estimatedDeliveryFrom(placedAt),
     timeline,
   };
 }

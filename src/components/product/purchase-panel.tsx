@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MAX_PER_SELECTION } from "@/lib/limits";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { LocalTime } from "@/components/orders/local-time";
 import { AvailabilityMessage } from "./availability-message";
 import { PriceBlock } from "./price-block";
 import { usePurchase } from "./purchase-context";
@@ -19,6 +20,8 @@ type Props = {
   optionName: string | null;
   /** Delivery line derived from the checkout shipping rules. */
   shippingNote: string;
+  /** ISO time an order placed now is expected to arrive (same timeline as orders). */
+  deliveryEstimate: string;
 };
 
 const FORM_ID = "purchase-form";
@@ -27,7 +30,7 @@ const FORM_ID = "purchase-form";
  * The purchase area: price, availability, variants, quantity and the primary action.
  * On small screens a sticky bar repeats price and action once this panel scrolls out of view.
  */
-export function PurchasePanel({ title, optionName, shippingNote }: Props) {
+export function PurchasePanel({ title, optionName, shippingNote, deliveryEstimate }: Props) {
   const { variants, selected, select } = usePurchase();
   const selectedId = selected.id;
   const [state, action, pending] = useActionState<FormState, FormData>(addToCartAction, {});
@@ -97,6 +100,13 @@ export function PurchasePanel({ title, optionName, shippingNote }: Props) {
             {soldOut ? "Currently unavailable" : pending ? "Adding..." : "Add to cart"}
           </Button>
         </form>
+        {soldOut ? null : (
+          <p className="text-sm">
+            <span className="font-medium">Get it by </span>
+            <LocalTime iso={deliveryEstimate} />
+            <span className="text-muted-foreground"> if you order now (demo delivery timeline)</span>
+          </p>
+        )}
         <p id="purchase-note" className="text-sm text-muted-foreground">
           {shippingNote}
         </p>

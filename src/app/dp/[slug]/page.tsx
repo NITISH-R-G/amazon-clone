@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductGallery } from "@/components/product/product-gallery";
+import { ProductGrid } from "@/components/product/product-grid";
+import { ProductSpecs } from "@/components/product/product-specs";
 import { LivePrice, PurchaseProvider } from "@/components/product/purchase-context";
 import { PurchasePanel } from "@/components/product/purchase-panel";
 import { RatingStars } from "@/components/product/rating-stars";
@@ -9,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { formatUsd } from "@/lib/money";
 import { availabilityState } from "@/modules/catalog";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
+import { estimatedDeliveryFrom } from "@/modules/orders";
 import { getApp } from "@/server/runtime";
 
 export async function generateMetadata({ params }: PageProps<"/dp/[slug]">): Promise<Metadata> {
@@ -32,6 +35,13 @@ export default async function ProductPage({ params }: PageProps<"/dp/[slug]">) {
     stock: v.stock,
     state: availabilityState(v.stock),
   }));
+  // Related: the best-rated products of the same department, without this one.
+  const related = category
+    ? (await app.search.searchProducts({ categorySlug: category.slug, sort: "rating", pageSize: 5 })).items
+        .filter((p) => p.slug !== product.slug)
+        .slice(0, 4)
+    : [];
+  const deliveryEstimate = estimatedDeliveryFrom(new Date()).toISOString();
   const shippingNote = `Free shipping on orders over ${formatUsd(FREE_SHIPPING_THRESHOLD_CENTS)}, otherwise ${formatUsd(FLAT_SHIPPING_CENTS)}. Payment is simulated in this demo.`;
 
   return (
@@ -71,12 +81,26 @@ export default async function ProductPage({ params }: PageProps<"/dp/[slug]">) {
             </ul>
           </section>
         ) : null}
+        <ProductSpecs specs={product.specs} />
       </div>
 
       <aside aria-label="Purchase" className="lg:border-t lg:pt-8 xl:sticky xl:top-6 xl:self-start xl:border-t-0 xl:pt-0">
-        <PurchasePanel title={product.title} optionName={product.optionName} shippingNote={shippingNote} />
+        <PurchasePanel title={product.title} optionName={product.optionName} shippingNote={shippingNote} deliveryEstimate={deliveryEstimate} />
       </aside>
     </article>
+    {related.length > 0 ? (
+      <section aria-labelledby="related" className="mt-20 space-y-6 border-t pt-10">
+        <div className="flex items-end justify-between gap-4">
+          <h2 id="related" className="text-xl font-semibold tracking-[-0.01em]">
+            More in {category?.name}
+          </h2>
+          <Link href={`/s?c=${category?.slug}&sort=rating`} className="flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-muted-foreground">
+            View all
+          </Link>
+        </div>
+        <ProductGrid products={related} />
+      </section>
+    ) : null}
     </PurchaseProvider>
   );
 }

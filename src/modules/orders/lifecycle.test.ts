@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Clock } from "@/lib/ports";
+import { estimatedDeliveryFrom } from "@/modules/orders";
 import { createTestApp } from "@/test-support/app";
 
 const g1 = { guestToken: "g1" };
@@ -96,5 +97,11 @@ describe("order lifecycle", () => {
     expect(await app.checkout.cancelOrder(g1, id)).toEqual({ ok: false, error: "NOT_CANCELLABLE" });
     expect((await read()).status).toBe("shipped");
     expect((await app.catalog.getAvailability("var-kettle")).quantity).toBe(3); // stock untouched
+  });
+
+  it("T58: the delivery estimate shown before buying is the one the order will carry", async () => {
+    const { read } = await setup();
+    const order = await read();
+    expect(estimatedDeliveryFrom(order.placedAt)).toEqual(order.estimatedDelivery);
   });
 });
