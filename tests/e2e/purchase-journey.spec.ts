@@ -11,6 +11,22 @@ const product = (name: "desktop" | "mobile") =>
 // Totals are hand-worked from the provisional rules: mug 1899 + 499 shipping + 152 tax = 2550;
 // pour-over 4200 (free shipping) + 336 tax = 4536.
 
+test("search results lead to a product, and key pages do not overflow horizontally", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox", { name: /search/i }).or(page.getByPlaceholder("Search products")).first().fill("kettle");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/s\?.*k=kettle/);
+
+  for (const path of ["/", "/s", "/s?k=kettle", "/dp/linden-ceramic-pour-over-set", "/cart"]) {
+    await page.goto(path);
+    const { sw, cw } = await page.evaluate(() => ({
+      sw: document.documentElement.scrollWidth,
+      cw: document.documentElement.clientWidth,
+    }));
+    expect(sw, `horizontal overflow on ${path}`).toBeLessThanOrEqual(cw);
+  }
+});
+
 test("a guest can buy a product from product page to confirmation", async ({ page }, testInfo) => {
   const item = product(testInfo.project.name as "desktop" | "mobile");
 
@@ -21,7 +37,7 @@ test("a guest can buy a product from product page to confirmation", async ({ pag
   await expect(page).toHaveURL(/\/cart/);
   await expect(page.getByText("Added to your cart.")).toBeVisible();
   await expect(page.getByRole("link", { name: item.title }).first()).toBeVisible();
-  await page.getByRole("link", { name: "Proceed to checkout" }).click();
+  await page.getByRole("link", { name: "Checkout" }).click();
 
   await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();
   await page.getByLabel("Full name").fill("Ada Lovelace");

@@ -17,6 +17,7 @@ type Props = {
   disabled?: boolean;
 };
 
+/** Quantity with 44 px targets and tabular numerals. Value is clamped to [min, max]. */
 export function QuantityStepper({ name, defaultValue = 1, min = 1, max, label = "Quantity", onCommit, disabled }: Props) {
   const id = useId();
   const [value, setValue] = useState(String(defaultValue));
@@ -29,7 +30,7 @@ export function QuantityStepper({ name, defaultValue = 1, min = 1, max, label = 
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center" role="group" aria-label={label}>
       <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
@@ -37,6 +38,7 @@ export function QuantityStepper({ name, defaultValue = 1, min = 1, max, label = 
         type="button"
         variant="outline"
         size="icon"
+        className="rounded-r-none"
         aria-label="Decrease quantity"
         disabled={disabled || Number(value) <= min}
         onClick={() => commit(Number(value) - 1)}
@@ -48,7 +50,7 @@ export function QuantityStepper({ name, defaultValue = 1, min = 1, max, label = 
         name={name}
         inputMode="numeric"
         autoComplete="off"
-        className="h-9 w-14 text-center"
+        className="num w-14 rounded-none border-x-0 text-center"
         value={value}
         disabled={disabled}
         aria-describedby={`${id}-max`}
@@ -59,6 +61,7 @@ export function QuantityStepper({ name, defaultValue = 1, min = 1, max, label = 
         type="button"
         variant="outline"
         size="icon"
+        className="rounded-l-none"
         aria-label="Increase quantity"
         disabled={disabled || Number(value) >= max}
         onClick={() => commit(Number(value) + 1)}

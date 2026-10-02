@@ -154,7 +154,7 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
             <dt>Estimated tax</dt>
             <dd>{formatUsd(summary.taxCents)}</dd>
           </div>
-          <div className="flex justify-between border-t pt-2 text-lg font-bold text-price">
+          <div className="flex justify-between border-t pt-2 text-lg font-semibold">
             <dt>Order total</dt>
             <dd>{formatUsd(summary.totalCents)}</dd>
           </div>

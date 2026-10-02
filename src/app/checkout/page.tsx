@@ -20,7 +20,7 @@ export default async function CheckoutPage() {
         <h1 className="text-xl font-bold">Your cart is empty</h1>
         <p className="text-muted-foreground">Add something to your cart before checking out.</p>
         <Button asChild>
-          <Link href="/">Continue shopping</Link>
+          <Link href="/s">Continue shopping</Link>
         </Button>
       </Card>
     );

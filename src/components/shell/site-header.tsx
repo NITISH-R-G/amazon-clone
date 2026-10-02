@@ -1,44 +1,76 @@
-import { ShoppingCart } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { readGuestActor } from "@/server/guest";
 import { getApp } from "@/server/runtime";
+import { MobileMenu } from "./mobile-menu";
+import { SearchBar } from "./search-bar";
 
-async function cartCount(): Promise<number> {
-  const actor = await readGuestActor();
-  if (!actor) return 0;
+async function headerData() {
   const app = await getApp();
-  return (await app.cart.getCart(actor)).itemCount;
+  const actor = await readGuestActor();
+  const [categories, cart] = await Promise.all([
+    app.catalog.listCategories(),
+    actor ? app.cart.getCart(actor) : Promise.resolve(null),
+  ]);
+  return { categories, count: cart?.itemCount ?? 0 };
 }
 
+/**
+ * Light header with a hairline. Search is the centre of the header; the cart sits right.
+ * Small screens: menu, wordmark and cart on one row, search on its own row, a scrolling category strip below.
+ */
 export async function SiteHeader() {
-  const count = await cartCount();
+  const { categories, count } = await headerData();
+  const strip = "flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground";
   return (
-    <header className="bg-header text-header-foreground">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-xl font-bold tracking-tight outline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <span aria-hidden="true" className="inline-block size-3 rounded-full bg-primary" />
-          Cartly
-        </Link>
+    <header className="border-b bg-background">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:grid-cols-[auto_minmax(0,36rem)_auto] lg:justify-between lg:px-8">
+        <div className="flex items-center gap-1">
+          <MobileMenu categories={categories} />
+          <Link href="/" className="text-xl font-semibold tracking-tight">
+            Cartly
+          </Link>
+        </div>
+        <div className="order-last col-span-3 lg:order-none lg:col-span-1">
+          <SearchBar />
+        </div>
         <Link
           href="/cart"
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 outline-offset-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-primary"
+          className="relative flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-medium"
         >
-          <ShoppingCart aria-hidden="true" className="size-5" />
-          <span className="text-sm font-medium">Cart</span>
-          <span
-            aria-hidden="true"
-            className="min-w-6 rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-bold text-primary-foreground"
-          >
-            {count}
-          </span>
+          <ShoppingBag aria-hidden="true" className="size-5" />
+          <span className="hidden sm:inline">Cart</span>
+          {count > 0 ? (
+            <span aria-hidden="true" className="num grid h-5 min-w-5 place-items-center rounded-md bg-primary px-1 text-xs font-medium text-primary-foreground">
+              {count}
+            </span>
+          ) : null}
           <span className="sr-only">
             , {count} {count === 1 ? "item" : "items"} in cart
           </span>
         </Link>
       </div>
+      <nav aria-label="Categories" className="mx-auto max-w-[1280px] px-2 sm:px-4 lg:px-6">
+        <ul className="scrollbar-none flex overflow-x-auto">
+          <li>
+            <Link href="/s" className={strip}>
+              All
+            </Link>
+          </li>
+          {categories.map((c) => (
+            <li key={c.slug}>
+              <Link href={`/s?c=${c.slug}`} className={strip}>
+                {c.name}
+              </Link>
+            </li>
+          ))}
+          <li>
+            <Link href="/s?sale=1" className={strip}>
+              On sale
+            </Link>
+          </li>
+        </ul>
+      </nav>
     </header>
   );
 }

@@ -203,6 +203,15 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Validation method**: contrast checks for every token pair (AA); Impeccable `critique` then `audit` on the first implemented UI, applied selectively; browser review at 360, 768 and 1280 px; a "does the primary action win without colour?" check on PDP, cart and checkout; comparison against the "not to look like" list in `docs/recon/visual-system-proposal.md`.
 - **Sub-decisions**: bottom navigation is **not** added by default (decision test in the proposal); dark mode is out of scope for now; the wordmark stays a placeholder until you decide.
 
+## D21. D20 implemented: Hanken Grotesk validated, first slice shipped
+
+- **Typeface:** specimen rendered at 32px/600 and 375px. Hanken Grotesk digits are tabular by default (1111.11 and 8888.88 measure identically), numerals are compact and headings confident. Public Sans is proportional unless `tnum` is set. Hanken stays primary, Public Sans is the fallback; the `.num` utility is kept for safety.
+- **Slice:** Home, Search, Results, Product, Cart are built to the D20 tokens: no resting shadows, no gradients, no brand hue, success green only for savings and stock, destructive red only for errors and Remove.
+- **Variants:** modelled as one labelled variant list per product (`optionName`), shown as a radio group; the price and availability follow the selected variant.
+- **Navigation:** header search plus a scrolling category strip; a sheet menu on mobile. No bottom navigation (deferred by D20).
+- **Mobile purchase:** a sticky Add to cart bar appears only while the main button is off-screen.
+- **Search state** lives in the URL (`k`, `c`, `min`, `max`, `r`, `stock`, `sale`, `sort`, `page`).
+
 ## Review log
 
 | Date | Decision | Change |

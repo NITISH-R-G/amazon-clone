@@ -90,7 +90,7 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
       </div>
 
       <Button asChild>
-        <Link href="/">Continue shopping</Link>
+        <Link href="/s">Continue shopping</Link>
       </Button>
     </div>
   );
