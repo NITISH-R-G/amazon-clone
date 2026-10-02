@@ -1,0 +1,16 @@
+# Reference material: 90 MB of Amazon pages/assets with a logged-in session's identifiers. Never commit.
+recon/
+
+node_modules/
+.next/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.log
+!.agent-logs/_capture-errors.log
+.impeccable/config.local.json
