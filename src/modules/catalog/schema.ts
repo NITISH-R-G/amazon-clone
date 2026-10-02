@@ -1,4 +1,4 @@
-import { check, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, check, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export type ProductImage = { url: string; alt: string };
@@ -10,6 +10,37 @@ export const categories = pgTable("categories", {
   name: text("name").notNull(),
   position: integer("position").notNull().default(0),
 });
+
+/** A kind of product (smartphones, sofas, running shoes): the second level of navigation and the owner of its attributes. */
+export const productTypes = pgTable("product_types", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  categoryId: text("category_id").notNull(),
+  position: integer("position").notNull().default(0),
+});
+
+/**
+ * What a product type can say about itself. `role` "variation" attributes are what variants differ by
+ * (colour, storage, RAM); "spec" attributes are the technical details. `values` is the ordered vocabulary
+ * (empty means free text). `facet` attributes appear as filters when the type is in scope.
+ */
+export const attributeDefs = pgTable(
+  "attribute_defs",
+  {
+    id: text("id").primaryKey(),
+    typeId: text("type_id")
+      .notNull()
+      .references(() => productTypes.id),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    role: text("role").$type<"variation" | "spec">().notNull(),
+    facet: boolean("facet").notNull().default(false),
+    values: jsonb("values").$type<string[]>().notNull().default([]),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [unique("attribute_defs_type_key").on(t.typeId, t.key)],
+);
 
 export const products = pgTable("products", {
   id: text("id").primaryKey(),
@@ -26,6 +57,10 @@ export const products = pgTable("products", {
   featuredRank: integer("featured_rank"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   bullets: jsonb("bullets").$type<string[]>().notNull().default([]),
+  /** Null for hand-made fixtures; the type owns the attribute definitions. */
+  typeId: text("type_id").references(() => productTypes.id),
+  /** Typed spec values by attribute key, e.g. { processor: "Nexa N4", refresh_rate: "120 Hz" }. */
+  attributes: jsonb("attributes").$type<Record<string, string>>().notNull().default({}),
   /** Technical details shown as a table on the product page. */
   specs: jsonb("specs").$type<ProductSpec[]>().notNull().default([]),
   /** Name of the option the variants differ by (e.g. "Color", "Size"); null when single-variant. */
@@ -40,6 +75,12 @@ export const variants = pgTable(
       .notNull()
       .references(() => products.id),
     label: text("label"),
+    /** Stock-keeping unit; unique per variant. */
+    sku: text("sku").unique(),
+    /** The variant's choices by dimension, e.g. { color: "Black", storage: "256 GB", ram: "8 GB" }. */
+    selections: jsonb("selections").$type<Record<string, string>>().notNull().default({}),
+    /** Pictures for this variant; empty falls back to the product's. */
+    images: jsonb("images").$type<ProductImage[]>().notNull().default([]),
     priceCents: integer("price_cents").notNull(),
     listPriceCents: integer("list_price_cents"),
     stock: integer("stock").notNull().default(0),

@@ -2,7 +2,16 @@
 // produces is a combination of one type, one invented brand and one invented series name. Nothing here
 // comes from Amazon, a real brand's catalogue or a real customer. All brands are invented.
 
-export type Department = "audio" | "kitchen" | "home" | "desk" | "travel" | "wearables";
+export type Department =
+  | "audio"
+  | "kitchen"
+  | "home"
+  | "desk"
+  | "travel"
+  | "wearables"
+  | "electronics"
+  | "fashion"
+  | "furniture";
 
 export type ProductType = {
   category: Department;
@@ -34,6 +43,12 @@ export const BRANDS: Record<Department, string[]> = {
   desk: ["Tarn", "Quill", "Vantage", "Plinth", "Gridline", "Fathom", "Newel", "Ostro", "Parley", "Strand"],
   travel: ["Tarn", "Cairn", "Drift", "Fell", "Gannet", "Haven", "Ridgeway", "Tolland", "Upland", "Vesper"],
   wearables: ["Marlow", "Tideline", "Brae", "Corvus", "Dunmore", "Fjord", "Gale", "Harrow", "Ibis", "Jetty"],
+  electronics: [
+    "Nexa", "Pellicle", "Auralis", "Voltra", "Kinetic", "Zephyra", "Ortham", "Lumeo", "Quanta", "Veritas",
+    "Helix", "Brightwell", "Tessera", "Arcadia", "Stellan", "Mirova",
+  ],
+  fashion: ["Stride", "Loomwell", "Northfield", "Oakhaven", "Pacer", "Ridgeline", "Sable", "Thistle", "Umber", "Wren", "Yarrow", "Zenith & Co"],
+  furniture: ["Harlow", "Ashgrove", "Birchfield", "Cobalt Lane", "Denholm", "Elmsworth", "Fernhill", "Greywood", "Holloway", "Ironside", "Juniper & Pine", "Kestrel Home"],
 };
 
 export const SERIES = [
@@ -48,7 +63,7 @@ export const PRODUCT_TYPES: ProductType[] = [
     category: "audio", shape: "headphones", noun: "Over-Ear Headphones", price: [39, 349], colors: NEUTRALS,
     mods: ["Wireless", "Noise-Cancelling", "Studio", "Closed-Back", "Open-Back", "Bluetooth"],
     features: ["40 mm dynamic drivers with a balanced, low-distortion sound", "Memory-foam ear cushions for long listening sessions", "Foldable frame with a padded carry pouch", "Detachable 1.2 m cable for wired use", "Multipoint pairing with two devices at once", "Touch-free controls on the ear cup"],
-    specs: [["Driver size", ["40 mm", "45 mm", "50 mm"]], ["Battery life", ["30 hours", "40 hours", "50 hours", "60 hours"]], ["Connectivity", ["Bluetooth 5.3", "Bluetooth 5.2", "Bluetooth 5.3 and 3.5 mm"]], ["Weight", ["240 g", "260 g", "285 g", "310 g"]], ["Charging", ["USB-C, 3 h", "USB-C, 2.5 h", "USB-C, 2 h"]]],
+    specs: [["Driver size", ["40 mm", "45 mm", "50 mm"]], ["Battery life", ["30 hours", "40 hours", "50 hours", "60 hours"]], ["Connectivity", ["Bluetooth 5.3", "Bluetooth 5.2", "Bluetooth 5.3 and 3.5 mm"]], ["Weight", ["240 g", "260 g", "285 g", "310 g"]], ["Charging", ["USB-C, 3 h", "USB-C, 2.5 h", "USB-C, 2 h"]], ["Microphone", ["Built-in, 4-mic array", "Built-in, boom mic", "Built-in, single mic"]], ["Noise cancellation", ["Active (hybrid)", "Active (adaptive)", "Passive only"]]],
     blurbs: ["Over-ear headphones tuned for clear vocals and controlled bass.", "A comfortable pair of closed-back headphones for work, travel and long evenings.", "Wireless headphones with a wide soundstage and a lightweight build."],
     uses: ["Switches between wired and wireless in seconds, so one pair covers the desk and the commute.", "Ships with a USB-C charging cable, a 3.5 mm cable and a travel pouch."],
   },

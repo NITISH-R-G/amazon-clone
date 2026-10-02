@@ -1,8 +1,8 @@
 import { and, asc, eq, gte, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import { err, ok, type Result } from "@/lib/result";
-import { categories, products, variants } from "../schema";
-import type { AvailabilityState, Category, Product, VariantDetail } from "../types";
+import { attributeDefs, categories, productTypes, products, variants } from "../schema";
+import type { AttributeDef, AvailabilityState, Category, Product, ProductType, VariantDetail } from "../types";
 import { createFind } from "./find";
 
 /** Out of stock at 0, low stock from 1 to 5, otherwise in stock. */
@@ -24,6 +24,14 @@ class OutOfStockSignal extends Error {
   constructor(readonly variantId: string) {
     super(`out of stock: ${variantId}`);
   }
+}
+
+async function loadType(d: DbOrTx, where: ReturnType<typeof eq>): Promise<ProductType | null> {
+  const [type] = await d.select().from(productTypes).where(where).limit(1);
+  if (!type) return null;
+  const defs = await d.select().from(attributeDefs).where(eq(attributeDefs.typeId, type.id)).orderBy(asc(attributeDefs.position));
+  const attributes: AttributeDef[] = defs.map(({ key, label, role, facet, values }) => ({ key, label, role, facet, values }));
+  return { id: type.id, slug: type.slug, name: type.name, categoryId: type.categoryId, attributes };
 }
 
 export function createCatalog({ db }: CatalogDeps) {
@@ -74,8 +82,30 @@ export function createCatalog({ db }: CatalogDeps) {
         ...variant,
         productSlug: product.slug,
         title: variant.label ? `${product.title} (${variant.label})` : product.title,
-        imageUrl: product.images[0]?.url ?? null,
+        // The picture follows the variant (a Black phone shows black), else the product's.
+        imageUrl: variant.images[0]?.url ?? product.images[0]?.url ?? null,
       };
+    },
+
+    /** A product type with its attribute definitions in display order, by id. */
+    async getType(typeId: string, tx?: DbOrTx): Promise<ProductType | null> {
+      return loadType(tx ?? db, eq(productTypes.id, typeId));
+    },
+
+    async getTypeBySlug(slug: string, tx?: DbOrTx): Promise<ProductType | null> {
+      return loadType(tx ?? db, eq(productTypes.slug, slug));
+    },
+
+    /** Types in navigation order, optionally within one department (category slug). */
+    async listTypes(categorySlug?: string, tx?: DbOrTx): Promise<{ id: string; slug: string; name: string; categoryId: string }[]> {
+      const d = tx ?? db;
+      const rows = await d
+        .select({ id: productTypes.id, slug: productTypes.slug, name: productTypes.name, categoryId: productTypes.categoryId, position: productTypes.position })
+        .from(productTypes)
+        .leftJoin(categories, eq(productTypes.categoryId, categories.id))
+        .where(categorySlug ? eq(categories.slug, categorySlug) : undefined)
+        .orderBy(asc(productTypes.position));
+      return rows.map((r) => ({ id: r.id, slug: r.slug, name: r.name, categoryId: r.categoryId }));
     },
 
     async getAvailability(variantId: string, tx?: DbOrTx): Promise<{ inStock: boolean; quantity: number }> {

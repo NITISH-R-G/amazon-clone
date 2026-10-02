@@ -64,6 +64,13 @@
       "when": 1790961521761,
       "tag": "0008_order_cancelled_at",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790963466476,
+      "tag": "0009_attributes_and_variants",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,9 @@ export type Variant = {
   id: string;
   productId: string;
   label: string | null;
+  sku: string | null;
+  selections: Record<string, string>;
+  images: ProductImage[];
   priceCents: Cents;
   listPriceCents: Cents | null;
   stock: number;
@@ -31,6 +34,8 @@ export type Product = {
   featuredRank: number | null;
   createdAt: Date;
   bullets: string[];
+  typeId: string | null;
+  attributes: Record<string, string>;
   specs: ProductSpec[];
   optionName: string | null;
 };
@@ -80,3 +85,14 @@ export type ProductPage = {
   /** Counts that ignore their own filter, so a facet shows what choosing it would give. */
   facets: { categories: CategoryCount[]; brands: BrandCount[] };
 };
+
+export type AttributeDef = {
+  key: string;
+  label: string;
+  role: "variation" | "spec";
+  facet: boolean;
+  /** Ordered vocabulary; empty means free text. */
+  values: string[];
+};
+
+export type ProductType = { id: string; slug: string; name: string; categoryId: string; attributes: AttributeDef[] };
