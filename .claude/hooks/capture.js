@@ -35,12 +35,40 @@ function transcriptPrompts(entries) {
   return entries.filter((e) => e.type === 'user' && !e.isSidechain && !e.isMeta && e.message && typeof e.message.content === 'string' && e.message.content.trim());
 }
 
+// Authoritative model sources in the Claude Code transcript, newest first:
+//   1. assistant entries: message.model (what actually answered)
+//   2. the session "model" attachment: attachment.identity.modelId (written at
+//      session start, before any assistant entry exists - this is what covers the
+//      first prompt of a fresh session)
 function lastModel(entries) {
   for (let i = entries.length - 1; i >= 0; i--) {
     const m = entries[i].message;
     if (entries[i].type === 'assistant' && m && m.model && m.model !== '<synthetic>') return m.model;
   }
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const a = entries[i].attachment;
+    if (entries[i].type === 'attachment' && a && a.type === 'model' && a.identity && a.identity.modelId) return a.identity.modelId;
+  }
   return null;
+}
+
+// Logs whose first prompt predates this are never rewritten (earlier captures are
+// left exactly as written).
+const BACKFILL_FROM = '2026-10-02T10:30:00.000Z';
+
+// Replace `model: unknown` on the header and on the most recent PROMPT entry with
+// the authoritative model, once the Stop hook has seen the turn's real response.
+function backfillUnknown(model) {
+  const f = findLog();
+  if (!f || !model || model === 'unknown') return;
+  const fp = path.join(logDir, f);
+  let body = fs.readFileSync(fp, 'utf8');
+  const first = (body.match(/^first_prompt_time: (.*)$/m) || [])[1];
+  if (!first || first < BACKFILL_FROM) return;
+  let out = body.replace(/^model: unknown$/m, `model: ${model}`); // header only (first match)
+  const i = out.lastIndexOf('[LOG_ENTRY type=PROMPT ');
+  if (i >= 0) out = out.slice(0, i) + out.slice(i).replace(/^model: unknown$/m, `model: ${model}`);
+  if (out !== body) fs.writeFileSync(fp, out);
 }
 
 // Final response = the text blocks of assistant entries after the last user entry
@@ -139,6 +167,12 @@ try {
     }
     const c2 = currentCounts();
     if (c2.responses < c2.prompts && text) append('RESPONSE', resp.ts || now, model, text);
+    backfillUnknown(resp.model || lastModel(entries));
+    const f2 = findLog();
+    if (f2 && /^model: unknown$/m.test(fs.readFileSync(path.join(logDir, f2), 'utf8').split('[LOG_ENTRY')[0] + '')) {
+      fs.appendFileSync(path.join(logDir, '_capture-errors.log'), `${now} model still unknown for ${sessionId}
+`);
+    }
   }
 } catch (err) {
   try { fs.appendFileSync(path.join(root, '.agent-logs', '_capture-errors.log'), `${new Date().toISOString()} ${mode}: ${err && err.stack}\n`); } catch (_) {}
