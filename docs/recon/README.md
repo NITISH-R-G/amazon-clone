@@ -26,6 +26,13 @@ Inspected 2026-10-02 (Phase 0). Method: file inventory with content hashing and 
 | [asset-analysis.md](asset-analysis.md) | `recon-v2` assets by category A to D |
 | [design-evidence.md](design-evidence.md) | Tokens and styles supported by `recon-v2` |
 | [component-mapping.md](component-mapping.md) | Evidence to components to shadcn; route impact |
+| [ecommerce-reference-inventory.md](ecommerce-reference-inventory.md) | Amazon, Flipkart, open-source and live-browser evidence; licences |
+| [amazon-vs-flipkart.md](amazon-vs-flipkart.md) | Structured comparison and differentiation opportunities |
+| [open-source-reference-analysis.md](open-source-reference-analysis.md) | YNS and shadcnspace: licences, patterns, fit |
+| [component-reuse-map.md](component-reuse-map.md) | Reference to component to shadcn to reuse/adapt/rebuild |
+| [page-inventory.md](page-inventory.md) | Canonical pages, evidence sufficiency, missing-capture reassessment |
+| [visual-system-proposal.md](visual-system-proposal.md) | Original visual identity proposal |
+| [catalogue-schema-proposal.md](catalogue-schema-proposal.md) | Catalogue fields and relationships |
 
 ## Findings that change the plan
 
