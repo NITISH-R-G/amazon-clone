@@ -7,7 +7,9 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     // Each test starts its own in-process Postgres (~3 s cold on a loaded machine; several files run in parallel).
-    testTimeout: 60_000,
-    hookTimeout: 60_000,
+    // The demo-catalogue files also seed ~2,400 products and ~9,000 variants; cap parallel files so they do not starve each other.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
+    maxWorkers: 4,
   },
 });
