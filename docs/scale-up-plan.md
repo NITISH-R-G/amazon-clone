@@ -150,3 +150,34 @@ Migrations and seeding run inside the Vercel build using that variable, so I nev
 - Serverless cold starts open a new connection; keep the pool small and the start path free of migration or seed work.
 - Synthetic data that reads as obviously fake would undercut the whole slice; spend the time on product types and attribute vocabularies, not on volume.
 - The relaxed-match and typo behaviour users already see must not regress when search moves to SQL; the existing tests T27-T33, T45-T47 are the contract.
+
+## 12. Outcome so far (slices 1 to 5 built; deployment gate pending the account steps)
+
+| Slice | Result | Commit |
+|---|---|---|
+| 1. Database boundary | `pg` driver when `DATABASE_URL` is set, PGlite otherwise (T48); migrate and seed run at deploy time; E2E 10/10 against a real PostgreSQL 18 server; **not yet run on Neon/Vercel** | `efd7811` |
+| 2. Catalogue | 2,400 products (30 curated + 2,370 generated from 35 hand-written types), 6 departments, 58 brands, specs on every product, 312 shared illustrations; seed 1.3 s and 11 MB on PGlite (T49-T51) | `31a191f` |
+| 3. Search | Postgres full-text + trigram behind `catalog.findProducts`, brand facet, filler words, typo tolerance, relaxed matches; no catalogue loads (T52-T54) | `d89222b` |
+| 4. Order lifecycle | derived status, timeline, estimate, cancel with stock restore (T55-T57) | `fce4fd6` |
+| 5. Product depth | technical details, delivery estimate (same function as orders, T58), related products | `be65d66` |
+
+**Reality check (production build, in-memory PGlite, 2,400 products, 3 runs, warm):**
+
+| Request | Before (30 products, in-memory search) | After the scale-up |
+|---|---|---|
+| Home (3 rails) | 65-90 ms | 85-120 ms |
+| Same page with 2,400 products and the old search | 0.95 s | n/a (replaced) |
+| Results `?k=headphones` | 50 ms | 80-135 ms |
+| Results by category, sorted, page 5 | n/a | 50-70 ms |
+| Typo query ("speker") | n/a | ~0.2 s |
+| Multi-word partial match | n/a | ~0.4 s |
+| Product page | 33 ms | 30-50 ms |
+| First request after start (PGlite init + seed) | 2.5 s | ~4.6 s (production uses Postgres, which is seeded at deploy) |
+
+Caveat: these numbers are on PGlite (Postgres compiled to WebAssembly) on a loaded laptop; the fuzzy paths do a sequential trigram scan there. They must be re-measured on Neon.
+
+**QA so far:** 58 unit/integration tests, 12 E2E (6 journeys on desktop and mobile), typecheck, lint, build all green. A browser audit of 12 routes at 320, 375, 390, 430, 768, 1024 and 1440 found no overflow, console errors, contrast or focus-ring failures or heading skips. Impeccable detector: no findings. Lifecycle states (placed, out for delivery, delivered) were checked visually by backdating an order in a scratch database.
+
+**Defects the tests and E2E found and that were fixed:** nonsense queries matching common words (filler list and prefix-only partial matches), symbols-only queries matching everything, the first related/top result no longer being a specific curated product (test brittleness), and slow fuzzy queries (single scan reused for count, page and facets).
+
+**Remaining before the deployment gate:** Neon + Vercel setup (account actions in section 8), the production run of the 15-point gate, re-measured latency on Neon, and a short wait to observe Shipped on the live site.
