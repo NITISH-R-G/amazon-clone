@@ -252,6 +252,14 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Seller handling time** delays the order's whole delivery timeline and the end of the cancel window (`orders.delivery_extra_minutes`); status is still one lifecycle per order.
 - Not built: seller pages, dashboards, ratings, per-line shipments.
 
+## D27. Two-phase checkout: stock reservation, separate payment and order state
+
+- **Flow:** start checkout (one transaction: re-price from the server cart, create the order *awaiting payment*, hold the stock for 15 minutes) -> create the payment at the provider -> a verified provider event (webhook, server-side retrieval, or the demo bank) -> on success commit the hold to sold stock, place the order (the fulfilment clock starts at `paid_at`) and clear the cart. The cart is kept until payment succeeds.
+- **Two state machines, never mixed:** payment `pending / requires_action / processing / succeeded / failed / canceled / partially_refunded / refunded` (pure `applyPaymentEvent`); order `awaiting_payment / expired / placed / shipped / out_for_delivery / delivered / cancelled` plus a separate `refund_status`.
+- **Last unit:** the stock row is locked while holding, so two customers cannot both hold or buy the final unit. Holds expire lazily (no job queue). A payment that succeeds after its hold expired is honoured if the unit is still free, otherwise the order is cancelled and refunded.
+- **Idempotency:** same start key returns the same order (a changed cart is refused); provider events are deduplicated by event id; a refund row exists (pending) before the provider is called and its id is the provider idempotency key. A failed refund is shown as failed, never as refunded.
+- Unpaid orders are not order history. Orders created before this change are backfilled as paid.
+
 ## Review log
 
 | Date | Decision | Change |

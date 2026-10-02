@@ -63,10 +63,16 @@ export function OrderDetail({ order }: { order: Order }) {
         </div>
         <div className="space-y-1 text-sm">
           <h3 className="font-semibold">Payment</h3>
-          <p>
-            <span className="capitalize">{order.payment.brand}</span> ending in {order.payment.last4}
-          </p>
-          <p className="text-muted-foreground">Demo payment: no card was charged.</p>
+          {order.payment ? (
+            <>
+              <p>
+                <span className="capitalize">{order.payment.brand}</span> ending in {order.payment.last4}
+              </p>
+              <p className="text-muted-foreground">Demo payment: no card was charged.</p>
+            </>
+          ) : (
+            <p className="text-muted-foreground">Not paid yet.</p>
+          )}
         </div>
       </aside>
     </div>

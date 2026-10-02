@@ -14,14 +14,22 @@ export const orders = pgTable(
     totalCents: integer("total_cents").notNull(),
     contactEmail: text("contact_email").notNull(),
     address: jsonb("address").$type<ShippingAddress>().notNull(),
-    paymentReference: text("payment_reference").notNull(),
-    paymentBrand: text("payment_brand").notNull(),
-    paymentLast4: text("payment_last4").notNull(),
+    // Filled when the payment is confirmed; null while the order awaits payment.
+    paymentReference: text("payment_reference"),
+    paymentBrand: text("payment_brand"),
+    paymentLast4: text("payment_last4"),
     idempotencyKey: text("idempotency_key").notNull(),
+    /** When the order record was created (checkout started). */
     placedAt: timestamp("placed_at", { withTimezone: true }).notNull(),
+    /** When payment was confirmed: the order is "placed" from here and the fulfilment clock starts. Null = awaiting payment. */
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Until when the stock is held for an unpaid order. */
+    holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
+    /** Money back after a cancellation: pending, refunded or failed. Null when nothing is owed. */
+    refundStatus: text("refund_status").$type<"pending" | "refunded" | "failed">(),
     /** Latest seller handling time on the order (minutes): delays every step after "placed". */
     deliveryExtraMinutes: integer("delivery_extra_minutes").notNull().default(0),
-    /** The only stored lifecycle fact; every other status is derived from `placedAt` and the clock. */
+    /** Stored lifecycle facts are `paidAt` and `cancelledAt`; every other status is derived from them and the clock. */
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
   (t) => [unique("orders_owner_idempotency").on(t.ownerKey, t.idempotencyKey)],

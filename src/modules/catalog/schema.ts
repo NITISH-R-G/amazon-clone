@@ -1,4 +1,4 @@
-import { boolean, check, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export type ProductImage = { url: string; alt: string };
@@ -117,4 +117,28 @@ export const offers = pgTable(
     stock: integer("stock").notNull().default(0),
   },
   (t) => [check("offers_stock_non_negative", sql`${t.stock} >= 0`)],
+);
+
+/**
+ * A temporary claim on stock while a customer pays (decision D27). While `held` and not yet expired it reduces what
+ * other orders can reserve; `committed` means the stock was taken for good; `released` means it was given back.
+ * `offer_id` is '' for the first-party unit (the variant itself).
+ */
+export const stockReservations = pgTable(
+  "stock_reservations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: text("order_id").notNull(),
+    variantId: text("variant_id").notNull(),
+    offerId: text("offer_id").notNull().default(""),
+    quantity: integer("quantity").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    status: text("status").$type<"held" | "committed" | "released">().notNull().default("held"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("stock_reservations_order_unit").on(t.orderId, t.variantId, t.offerId),
+    check("stock_reservations_quantity_positive", sql`${t.quantity} > 0`),
+    index("stock_reservations_unit_idx").on(t.variantId, t.offerId, t.status),
+  ],
 );

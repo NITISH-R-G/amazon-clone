@@ -92,6 +92,20 @@
       "when": 1790964926936,
       "tag": "0012_offers",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790968321050,
+      "tag": "0013_stock_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790968809757,
+      "tag": "0014_order_payment_state",
+      "breakpoints": true
     }
   ]
 }

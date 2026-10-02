@@ -13,7 +13,19 @@ export const CANCEL_WINDOW_MS = SHIPPED_AFTER_MS;
 export const estimatedDeliveryFrom = (from: Date, extraMinutes = 0): Date =>
   new Date(from.getTime() + DELIVERED_AFTER_MS + extraMinutes * MIN);
 
-type Lifecycle = {
+/** The status facts of an order whose payment has not been confirmed. */
+export function unpaidLifecycle(placedAt: Date, cancelledAt: Date | null, holdExpiresAt: Date | null, now: Date): Lifecycle {
+  const created = { status: "awaiting_payment" as const, at: placedAt, reached: true };
+  if (cancelledAt && cancelledAt.getTime() <= now.getTime()) {
+    return { status: "cancelled", cancellable: false, estimatedDelivery: null, timeline: [created, { status: "cancelled", at: cancelledAt, reached: true }] };
+  }
+  if (holdExpiresAt && holdExpiresAt.getTime() <= now.getTime()) {
+    return { status: "expired", cancellable: false, estimatedDelivery: null, timeline: [created] };
+  }
+  return { status: "awaiting_payment", cancellable: true, estimatedDelivery: null, timeline: [created] };
+}
+
+export type Lifecycle = {
   status: OrderStatus;
   cancellable: boolean;
   estimatedDelivery: Date | null;

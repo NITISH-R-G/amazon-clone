@@ -6,6 +6,8 @@ import type { Order, OrderStatus } from "@/modules/orders";
 import { LocalTime } from "./local-time";
 
 export const statusLabel: Record<OrderStatus, string> = {
+  awaiting_payment: "Awaiting payment",
+  expired: "Expired",
   placed: "Placed",
   shipped: "Shipped",
   out_for_delivery: "Out for delivery",
@@ -14,6 +16,8 @@ export const statusLabel: Record<OrderStatus, string> = {
 };
 
 const stepLabel: Record<OrderStatus, string> = {
+  awaiting_payment: "Awaiting payment",
+  expired: "Payment window ended",
   placed: "Order placed",
   shipped: "Shipped",
   out_for_delivery: "Out for delivery",
@@ -25,6 +29,13 @@ const cancelMessages: Record<string, string> = {
   late: "This order has already shipped, so it can no longer be cancelled.",
   missing: "We could not find that order.",
 };
+
+function refundNote(order: Order): string {
+  if (!order.paidAt) return " Nothing was charged.";
+  if (order.refundStatus === "refunded") return " Your payment has been refunded.";
+  if (order.refundStatus === "failed") return " The refund did not go through yet; we will retry it.";
+  return " Your refund is being processed.";
+}
 
 /** Where the order is, when each step happens, and (while it is still possible) a way to cancel. */
 export function OrderStatusPanel({ order, returnTo, cancelNotice }: { order: Order; returnTo: string; cancelNotice?: string }) {
@@ -45,7 +56,7 @@ export function OrderStatusPanel({ order, returnTo, cancelNotice }: { order: Ord
             </>
           ) : order.status === "cancelled" && order.cancelledAt ? (
             <>
-              Cancelled <LocalTime iso={iso(order.cancelledAt)} />. Demo payment: nothing was charged.
+              Cancelled <LocalTime iso={iso(order.cancelledAt)} />.{refundNote(order)}
             </>
           ) : order.estimatedDelivery ? (
             <>

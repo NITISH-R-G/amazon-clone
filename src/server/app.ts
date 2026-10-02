@@ -6,6 +6,7 @@ import { createCart } from "@/modules/cart";
 import { createCatalog } from "@/modules/catalog";
 import { createCheckout } from "@/modules/checkout";
 import { createOrders } from "@/modules/orders";
+import { createPayments } from "@/modules/payments";
 import { createSearch } from "@/modules/search";
 import type { PaymentProvider } from "@/modules/payments";
 
@@ -25,13 +26,14 @@ export type AppDeps = {
 
 /** Composition root: wires modules together. Used by the runtime and by tests. */
 export function createApp({ db, clock, ids, payments }: AppDeps) {
-  const catalog = createCatalog({ db });
+  const catalog = createCatalog({ db, clock });
   const cart = createCart({ db, catalog });
   const orders = createOrders({ db, clock });
-  const checkout = createCheckout({ db, cart, catalog, orders, payments, clock, ids });
+  const paymentService = createPayments({ db, clock, provider: payments });
+  const checkout = createCheckout({ db, cart, catalog, orders, payments: paymentService, clock, ids });
   const search = createSearch({ catalog });
   const auth = createAuth({ db, clock, ids });
-  return { db, catalog, cart, orders, checkout, search, auth };
+  return { db, catalog, cart, orders, payments: paymentService, checkout, search, auth };
 }
 
 export type App = ReturnType<typeof createApp>;

@@ -1,7 +1,8 @@
-import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import { err, ok, type Result } from "@/lib/result";
-import { attributeDefs, categories, offers, productTypes, products, sellers, variants } from "../schema";
+import type { Clock } from "@/lib/ports";
+import { attributeDefs, categories, offers, productTypes, products, sellers, stockReservations, variants } from "../schema";
 import type { OfferView } from "../offers";
 import type { AttributeDef, Category, Product, ProductType, VariantDetail } from "../types";
 import { createFind } from "./find";
@@ -13,7 +14,7 @@ function toProduct(row: ProductRow, rows: Product["variants"]): Product {
   return { ...rest, rating: ratingTenths / 10, variants: rows };
 }
 
-export type CatalogDeps = { db: DbOrTx };
+export type CatalogDeps = { db: DbOrTx; clock: Clock };
 
 class OutOfStockSignal extends Error {
   constructor(readonly variantId: string) {
@@ -29,7 +30,40 @@ async function loadType(d: DbOrTx, where: ReturnType<typeof eq>): Promise<Produc
   return { id: type.id, slug: type.slug, name: type.name, categoryId: type.categoryId, attributes };
 }
 
-export function createCatalog({ db }: CatalogDeps) {
+export type ReserveLine = { variantId: string; quantity: number; offerId?: string | null };
+
+/** The stock row of a unit (first-party variant or seller offer), locked until the transaction ends. */
+async function lockStock(t: DbOrTx, variantId: string, offerId: string): Promise<number | undefined> {
+  if (offerId) {
+    const [row] = await t
+      .select({ stock: offers.stock })
+      .from(offers)
+      .where(and(eq(offers.id, offerId), eq(offers.variantId, variantId)))
+      .for("update");
+    return row?.stock;
+  }
+  const [row] = await t.select({ stock: variants.stock }).from(variants).where(eq(variants.id, variantId)).for("update");
+  return row?.stock;
+}
+
+/** Units of this stock held by other orders right now (unexpired holds only). */
+async function heldByOthers(t: DbOrTx, orderId: string, variantId: string, offerId: string, now: Date): Promise<number> {
+  const [row] = await t
+    .select({ held: sql<number>`coalesce(sum(${stockReservations.quantity}), 0)` })
+    .from(stockReservations)
+    .where(
+      and(
+        eq(stockReservations.variantId, variantId),
+        eq(stockReservations.offerId, offerId),
+        eq(stockReservations.status, "held"),
+        gt(stockReservations.expiresAt, now),
+        ne(stockReservations.orderId, orderId),
+      ),
+    );
+  return Number(row?.held ?? 0);
+}
+
+export function createCatalog({ db, clock }: CatalogDeps) {
   return {
     /** Filtered, searched, sorted and paginated products with facet counts (see ./find.ts). */
     findProducts: createFind({ db }),
@@ -158,6 +192,78 @@ export function createCatalog({ db }: CatalogDeps) {
         handlingMinutes: offer.handlingMinutes,
         stock: offer.stock,
       };
+    },
+
+    /**
+     * Holds stock for an order while its payment is pending. All lines or none. The stock row is locked first, so
+     * two customers racing for the final unit are serialised: the second sees the first's hold and fails.
+     */
+    async reserveStock(orderId: string, lines: ReserveLine[], expiresAt: Date, tx?: DbOrTx): Promise<Result<void, { variantId: string }>> {
+      const now = clock.now();
+      const ordered = [...lines].sort((a, b) => `${a.variantId}|${a.offerId ?? ""}`.localeCompare(`${b.variantId}|${b.offerId ?? ""}`));
+      try {
+        await (tx ?? db).transaction(async (t) => {
+          for (const line of ordered) {
+            const offerId = line.offerId ?? "";
+            const stock = await lockStock(t, line.variantId, offerId);
+            if (stock === undefined) throw new OutOfStockSignal(line.variantId);
+            const [existing] = await t
+              .select({ status: stockReservations.status })
+              .from(stockReservations)
+              .where(and(eq(stockReservations.orderId, orderId), eq(stockReservations.variantId, line.variantId), eq(stockReservations.offerId, offerId)));
+            if (existing?.status === "committed") continue;
+            if (stock - (await heldByOthers(t, orderId, line.variantId, offerId, now)) < line.quantity) throw new OutOfStockSignal(line.variantId);
+            await t
+              .insert(stockReservations)
+              .values({ orderId, variantId: line.variantId, offerId, quantity: line.quantity, expiresAt, status: "held" })
+              .onConflictDoUpdate({
+                target: [stockReservations.orderId, stockReservations.variantId, stockReservations.offerId],
+                set: { quantity: line.quantity, expiresAt, status: "held" },
+              });
+          }
+        });
+        return ok(undefined);
+      } catch (e) {
+        if (e instanceof OutOfStockSignal) return err({ variantId: e.variantId });
+        throw e;
+      }
+    },
+
+    /**
+     * Turns an order's holds into sold stock (payment confirmed). Idempotent. A hold that already expired still
+     * commits if the unit is free, and fails if another order has since taken it.
+     */
+    async commitReservations(orderId: string, tx?: DbOrTx): Promise<Result<void, { variantId: string }>> {
+      const now = clock.now();
+      try {
+        await (tx ?? db).transaction(async (t) => {
+          const held = await t
+            .select()
+            .from(stockReservations)
+            .where(and(eq(stockReservations.orderId, orderId), eq(stockReservations.status, "held")));
+          for (const r of held) {
+            const stock = await lockStock(t, r.variantId, r.offerId);
+            if (stock === undefined || stock - (await heldByOthers(t, orderId, r.variantId, r.offerId, now)) < r.quantity) {
+              throw new OutOfStockSignal(r.variantId);
+            }
+            if (r.offerId) await t.update(offers).set({ stock: sql`${offers.stock} - ${r.quantity}` }).where(eq(offers.id, r.offerId));
+            else await t.update(variants).set({ stock: sql`${variants.stock} - ${r.quantity}` }).where(eq(variants.id, r.variantId));
+            await t.update(stockReservations).set({ status: "committed" }).where(eq(stockReservations.id, r.id));
+          }
+        });
+        return ok(undefined);
+      } catch (e) {
+        if (e instanceof OutOfStockSignal) return err({ variantId: e.variantId });
+        throw e;
+      }
+    },
+
+    /** Gives held (not yet committed) stock back: payment failed, expired or the order was cancelled. */
+    async releaseReservations(orderId: string, tx?: DbOrTx): Promise<void> {
+      await (tx ?? db)
+        .update(stockReservations)
+        .set({ status: "released" })
+        .where(and(eq(stockReservations.orderId, orderId), eq(stockReservations.status, "held")));
     },
 
     /** Puts units back (a cancelled order). Pass the caller's `tx` to join its transaction. */
