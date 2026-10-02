@@ -1,161 +1,120 @@
 # Technical architecture
 
-Status: proposal for Phase 1. Nothing here is implemented. Stack choice (Next.js App Router + TypeScript + Tailwind + shadcn/ui) was confirmed by the user on 2026-10-02; everything else is a recommendation.
+Status: proposal for Phase 1; nothing is implemented. The stack (Next.js App Router, TypeScript strict, Tailwind, shadcn/ui; pnpm on Node 24) was confirmed by the user. Everything else is a recommendation. Tags: **[R]** required for assessment, **[Q]** useful for quality, **[O]** optional if time remains.
 
-Each decision is tagged **[R]** required for assessment, **[Q]** useful for quality, **[O]** optional if time remains. Rule: do not over-engineer; build the thinnest thing that keeps the purchase journey correct and testable.
+Goal: a codebase that is easy for an AI agent to navigate and easy for a human to reason about. Few modules, each deep. Do not add abstractions until a second use or a test seam demands one.
 
-## 1. Environment discovered
+## 1. Principles
 
-| Item | Value |
-|---|---|
-| OS / shell | Windows 11, Git Bash + PowerShell |
-| Node | v24.18.0 (satisfies Next.js; Impeccable CLI requires ≥ 22.18) |
-| Package managers present | npm 11.16.0, pnpm 11.25.0 |
-| Repo | git, branch `main`, no remote, no `package.json` yet |
-| Recommended package manager | **pnpm** (installed, fast, strict) |
-| Browser tooling | Claude built-in browser (preview) and Claude in Chrome available for verification |
-| Deploy target | Vercel (recommended; not set up; deploy not started) |
+1. **Deep modules [R]**: each domain exposes a small public interface (`index.ts`) and hides its logic, data access and rules. Vocabulary: see the `codebase-design` skill (module, interface, depth, seam, adapter).
+2. **One entry point per module.** Other code imports only from `modules/<name>` (its `index.ts`), never from its internals. Enforce with an import-restriction lint rule [Q].
+3. **A module owns its tables and its rules.** No other module reads its tables; they call its interface.
+4. **Seams are the module interfaces.** Tests exercise behaviour through them (see `docs/agents/workflow.md`, `docs/testing-strategy.md`). Mock only the external ports in §3.
+5. **Server-first.** Server components read through module interfaces; server actions write through them; client components get plain data.
+6. **UI never holds business rules** (pricing, stock, status, authorisation); it renders what modules return.
 
-## 2. Application architecture [R]
-
-Single Next.js application (monorepo unnecessary). Server components by default; client components only for interactivity (search combobox, quantity stepper, gallery, menus). Business logic lives in a framework-free `domain/` layer so it can be unit-tested without React.
+## 2. Layout
 
 ```
 src/
-  app/                        routes (App Router), layouts, loading/error/not-found
+  app/            routes, layouts, loading/error/not-found, server actions (thin: parse → call module → revalidate)
+  modules/
+    catalog/  search/  cart/  checkout/  orders/  auth/  payments/  account/
+      index.ts    PUBLIC interface and types only
+      internal/   implementation, queries, rules (not importable from outside)
   components/
-    ui/                       shadcn primitives (generated; do not hand-edit logic)
-    shell/                    AmazonHeader, CategoryNav, Footer, ...
-    product/ cart/ checkout/ account/   feature components
-  domain/                     pure TS: pricing, cart, order state machine, search/filter
-  server/                     data access (repositories), auth, services, payment provider
-  lib/                        utils, formatting, validation schemas (zod)
-  tests/                      e2e/ (Playwright); unit tests colocated *.test.ts
-db/                           schema + migrations + seed
+    ui/           shadcn primitives (docs/ui.md)
+    shell/ product/ cart/ checkout/ account/    feature components (plain props)
+  lib/            shared utilities: money, dates, zod helpers (small; resist growth)
+db/               schema, migrations, seed
+tests/e2e/        Playwright journeys (docs/testing-strategy.md)
 ```
 
-## 3. Routing [R]
+Unit/integration tests are colocated with the module and import only its `index.ts`.
 
-| Route | Purpose | Rendering |
+## 3. Modules and public interfaces
+
+`product` is **folded into `catalog`**: a product page is a view over catalogue data, not a separate domain. Pricing is internal to `cart` (line and subtotal) and `checkout` (quote with shipping/tax); there is no shared "pricing" module.
+
+External **ports** (the only things mocked or faked in tests): `Clock`, `IdGenerator` (order numbers, tokens), `PaymentProvider`. Everything else runs for real against a test database.
+
+| Module | Purpose | Public interface (shape, not final signatures) | Hides | Depends on |
+|---|---|---|---|---|
+| **catalog** [R] | Products, variants, categories, availability, images | `getProduct(slug)`, `getVariant(id)`, `listCategories()`, `listProducts({ category, ids })`, `getAvailability(variantId)`; types `Product`, `Variant`, `Money` | Schema, joins, price/list-price rules, stock reads, image ordering | none |
+| **search** [R] | Query → ranked, filtered, sorted, paginated results with facets | `searchProducts(query: SearchQuery) → { items, total, facets, page }`, `parseSearchParams(URLSearchParams) → SearchQuery`, `suggest(text)` [Q] | Ranking, full-text or LIKE implementation, facet counting, param validation | catalog |
+| **cart** [R] | Guest and user carts, quantities, totals | `getCart(ctx)`, `addItem(ctx, variantId, qty)`, `setQuantity(ctx, lineId, qty)`, `removeItem(ctx, lineId)`, `restoreItem(ctx, lineId)` (undo), `mergeGuestCart(guestToken, userId)`, `saveForLater` [Q]; `Cart` includes totals and per-line availability | Persistence, stock clamping, max quantity, subtotal math, guest-token handling | catalog |
+| **checkout** [R] | Turn a cart into an order | `getQuote(ctx, { address, shippingMethod })`, `placeOrder(ctx, input) → Result<Order, CheckoutError>` | Server-side re-pricing, stock re-validation, shipping/tax rules, the transaction, idempotency, payment orchestration | cart, orders, payments, account |
+| **orders** [R] | Order history and lifecycle | `listOrders(userId)`, `getOrder(userId, id)`, `cancelOrder(userId, id)` [Q]; `createOrder` is used by `checkout` only; `statusAt(order, now)` | Status machine, time-derived progression, purchase-time snapshot, order numbers | none (reads `Clock`) |
+| **auth** [R] | Identity and sessions | `checkIdentifier(email)`, `register(input)`, `signIn(input)`, `signOut()`, `getSession()`, `requireUser(returnTo)` | Hashing, session storage, cookie flags, rate limiting, generic error policy | none |
+| **payments** [R] | Authorise a payment | `PaymentProvider.authorize({ amount, method }) → Approved | Declined`; demo provider validates card format and declines designated test numbers | Provider choice (demo now, Stripe test later), card validation, brand/last-four extraction | none |
+| **account** [Q; addresses required for checkout] | Addresses and profile | `listAddresses(userId)`, `saveAddress`, `deleteAddress`, `setDefaultAddress`, `getProfile`, `updateProfile` | Validation, default-address rule | auth |
+
+Dependency direction (no cycles): `app → checkout → {cart, orders, payments, account} → catalog`; `app → search → catalog`; `app → auth`. `orders` and `payments` do not import `cart`.
+
+### Seams worth testing first
+
+`cart` (totals, merge, stock clamp), `checkout.placeOrder` (re-pricing, atomicity, idempotency, declined payment), `search.searchProducts` + `parseSearchParams` (URL round-trip, filters), `orders.statusAt`, `auth` (register/sign-in/protection). These carry the business risk; UI components are verified in the browser first.
+
+## 4. Routing [R]
+
+| Route | Purpose | Notes |
 |---|---|---|
-| `/` | Home | RSC, cached |
-| `/s` | Search/category results (`?k=&i=&price=&rating=&sort=&page=`) | RSC, URL-driven |
-| `/dp/[slug]` (or `/[slug]/dp/[id]`) | Product detail | RSC + client buy box; ISR |
-| `/cart` | Cart | RSC + server actions |
-| `/checkout` | Single-page checkout | Dynamic, auth-gated |
-| `/checkout/confirmation/[orderId]` | Confirmation | Dynamic |
-| `/orders`, `/orders/[orderId]` | Order list/detail | Dynamic, auth-gated |
-| `/account`, `/account/addresses`, `/account/security` | Account | Dynamic, auth-gated |
-| `/signin`, `/register` | Auth | |
-| `/deals` | Deals listing | RSC [Q] |
-| `/help` | Static help hub | Static [O] |
-| `not-found`, `error` | Global states | |
+| `/` | Home | RSC |
+| `/s` | Search/category results (`?k=&i=&price=&rating=&sort=&page=`) | URL is the state |
+| `/dp/[slug]` | Product detail (mirrors Amazon's `/dp/<id>`) | RSC + client buy box |
+| `/cart` | Cart | server actions |
+| `/checkout` | Single-page checkout (address, delivery, payment, review) | auth-gated |
+| `/checkout/confirmation/[orderId]` | Confirmation | |
+| `/orders`, `/orders/[orderId]` | Orders | auth-gated |
+| `/account`, `/account/addresses` | Account | auth-gated |
+| `/signin`, `/register` | Identifier-first auth | `returnTo` preserved |
+| `/deals` [Q], `/help` [O] | | |
+| `not-found`, `error`, `loading` | Every data route | |
 
-The PDP URL mirrors Amazon's `/dp/<id>` pattern (observed in recon).
+## 5. State [R]
 
-## 4. Component architecture [R]
-
-- shadcn/ui primitives in `components/ui` (see `docs/recon/component-inventory.md` section 1 for the mapping).
-- Amazon-specific components composed from primitives. **Build only what Phase 1 pages need.**
-- Props are typed, minimal and data-shaped; presentational components receive plain data, not repositories.
-- Tokens come from `docs/recon/design-tokens.md` §2, implemented once in `globals.css` / Tailwind theme.
-
-## 5. State management [R]
-
-| State | Where | Why |
-|---|---|---|
-| Catalogue, orders, account | Server (RSC fetch + DB) | Source of truth; no client cache needed |
-| Search/filter/sort/page | **URL search params** | Shareable, back-button correct, testable |
-| Cart | Server (DB) keyed by cart cookie (guest) or user (signed in); **optimistic UI** via `useOptimistic` + server actions | Survives reloads/devices; merge on sign-in |
-| Form state | `react-hook-form` + zod [Q] (or native form + server action validation) | Boundary validation |
-| Ephemeral UI (menus, dialogs, gallery index) | Local component state | No global store; **no Redux/Zustand** unless proven necessary |
+Server is the source of truth. Search/filter/sort/page: **URL params**. Cart: database row keyed by guest cookie or user, with optimistic UI (`useOptimistic`) over server actions. Ephemeral UI state (menus, gallery index): local component state. No global client store.
 
 ## 6. Data model [R]
 
-Entities (Postgres via Drizzle ORM; SQLite acceptable locally):
+Postgres via Drizzle (SQLite acceptable locally). Money is **integer cents**, never floats. Entities: `User`, `Address`, `Category`, `Product`, `Variant`, `ProductImage`, `Cart`, `CartItem`, `Order`, `OrderItem` (purchase-time snapshot of title, unit price, image), `Review` [O]. Each table belongs to exactly one module (§1.3). Schema is created in Phase 1, not before.
 
-- `User(id, email, passwordHash, name, createdAt)`
-- `Session` (library-managed)
-- `Address(id, userId, fullName, line1, line2, city, region, postalCode, country, phone, isDefault)`
-- `Category(id, slug, name, parentId)`
-- `Product(id, slug, title, brand, description, categoryId, ratingAvg, ratingCount, status)`
-- `Variant(id, productId, sku, attrs jsonb, priceCents, listPriceCents, currency, stock)`
-- `ProductImage(id, productId, url, alt, position)`
-- `Cart(id, userId?, guestToken?, updatedAt)` and `CartItem(cartId, variantId, quantity)`
-- `Order(id, number, userId, status, subtotalCents, shippingCents, taxCents, totalCents, shippingAddress jsonb, paymentRef, placedAt)`
-- `OrderItem(orderId, variantId, title, unitPriceCents, quantity, imageUrl)` (snapshot of purchase-time data)
-- `Review(id, productId, userId, rating, title, body)` [O]
-- Money stored as integer cents. Never floats.
+## 7. Boundaries and validation [R]
 
-## 7. API boundaries [R]
+- Reads: server components call module interfaces directly (no internal HTTP).
+- Writes: server actions; route handlers only for external consumers or `fetch` boundaries (`/api/suggest`, `/api/health`).
+- Every action/handler parses input with a zod schema and returns a typed result `{ ok } | { error: { code, message, fieldErrors? } }`. Never trust client-sent prices or totals; the server recomputes from the database.
 
-- **Reads**: server components call repositories directly (no internal HTTP).
-- **Writes**: server actions for cart/address/checkout/auth forms; route handlers (`/api/*`) only where an external client or a `fetch` boundary is needed (search suggestions `GET /api/suggest`, health).
-- **Validation**: every action/handler parses input with a zod schema; returns typed `Result`/field errors; never trusts client prices (the server recomputes totals from DB prices).
-- **Errors**: stable error shape `{ code, message, fieldErrors? }`.
+## 8. Cross-cutting decisions
 
-## 8. Authentication approach [R]
+- **Authentication [R]**: email + password, identifier-first UI (step 1 email, step 2 password, create-account branch), httpOnly SameSite=Lax session cookie, argon2/bcrypt, Auth.js (credentials, DB sessions) or Better Auth (open). Middleware protects `/checkout`, `/orders`, `/account` and passes `returnTo`. Passkeys, OTP, social login out of scope.
+- **Cart persistence [R]**: guest identified by a random httpOnly token; on sign-in guest lines merge into the user's cart (sum, clamp to stock). Stock re-validated at checkout.
+- **Order lifecycle [R]**: `placed → paid → shipped → delivered`, plus `cancelled` (only before `shipped`). `shipped`/`delivered` are derived from `placedAt` and the clock when read, so no background worker is needed. Order creation is one transaction: validate → re-price → decrement stock → insert order and items → clear cart.
+- **Payments [R]**: demo provider, no card data stored (brand + last four only), clearly labelled "Demo payment: no card is charged". Stripe test mode is a [O] drop-in behind the same port.
+- **Search [R]**: begin with the simplest implementation that satisfies the `search` interface (a catalogue of a few hundred items does not need an engine); Postgres full-text is the [Q] upgrade; the interface does not change.
+- **Deployment [R for live demo]**: Vercel + managed Postgres, `DATABASE_URL`, `AUTH_SECRET`, seed at deploy. Not started.
+- **Observability [Q]**: `error.tsx`/`not-found.tsx` per route group, structured JSON logs for order, payment and auth outcomes (no PII, no card data), `/api/health`; Sentry/analytics [O].
+- **Security/privacy [R]**: authorisation on every user-scoped query, no secrets in the repo (`.env.example` only), rate-limit sign-in [Q], no Amazon scripts/tracking/tokens from `recon/` in the codebase.
 
-- Email + password with **Auth.js (credentials + database sessions)** or **Better Auth**; httpOnly, SameSite=Lax session cookie; argon2/bcrypt hashing; CSRF protection via framework defaults.
-- Identifier-first UI (matches Amazon): step 1 email, step 2 password, "create account" branch. Registration validates email format and password length; no email verification in scope [O].
-- Guest cart merge on sign-in.
-- Passkeys, OTP, social login: out of scope.
-- Route protection in middleware for `/checkout`, `/orders`, `/account`.
+## 9. Engineering conventions
 
-## 9. Cart persistence [R]
+TypeScript `strict`; no `any` without a written reason. Server components by default; `"use client"` only for interactivity. Every data-driven view has loading, error and empty states. Accessibility (WCAG 2.2 AA) and responsive behaviour (mobile first) are requirements, not polish. No unnecessary abstraction; no premature optimisation.
 
-Server-side cart row; guest identified by a random, httpOnly cookie token; on sign-in, guest items merge into the user cart (sum quantities, clamp to stock). Cart totals are computed by `domain/cart.ts` (pure, tested). Stock re-validated at checkout.
+## 10. Tradeoffs
 
-## 10. Order lifecycle [R]
-
-`placed` → `paid` → `shipped` → `delivered`, plus `cancelled` (allowed only before `shipped`) and `refunded` [O]. A pure state machine in `domain/order.ts` defines legal transitions. Because there is no real fulfilment, `shipped`/`delivered` advance via a **time-based simulation** derived from `placedAt` (computed on read) so tracking/status UI is demonstrable without background jobs. Order creation is a single DB transaction: validate cart → re-price → decrement stock → insert order/items → clear cart.
-
-## 11. Search and filter architecture [R]
-
-- `domain/search.ts`: query normalisation, filter parsing from URL, sort definitions.
-- Repository `searchProducts(params)` with Postgres full-text (`tsvector`, ranking) + facet counts; with a catalogue under a few hundred items an in-memory/`LIKE` implementation behind the **same interface** is acceptable to start [R], full-text is [Q].
-- Facets: department, price range, rating, availability (Prime-style filters omitted). Sort: featured, price asc/desc, rating, newest.
-- Suggestions: `GET /api/suggest?q=` with debounced client combobox [Q].
-
-## 12. Payment strategy [R]
-
-`PaymentProvider` interface (`authorize(amount, method) → {ok, ref} | {declined, reason}`) with a **demo implementation**: validates card number (Luhn), expiry, CVC format; certain test numbers force declines. No card data is stored; only brand + last four. Stripe test mode is an [O] drop-in later. Prominent "demo payment" label.
-
-## 13. Testing architecture [R]
-
-See `docs/testing-strategy.md`. Vitest (unit/integration), React Testing Library for client components [Q], Playwright (E2E + axe) with a seeded test database reset per run, MSW only if external calls appear.
-
-## 14. Deployment architecture [R for live demo]
-
-- Vercel (Next.js native); managed Postgres (Neon or Vercel Postgres); environment variables for `DATABASE_URL`, `AUTH_SECRET`; seed script run at deploy for demo data.
-- Preview deployments per branch [Q]; production on `main`.
-- Images: `next/image` with local `/public` assets or a bucket [Q].
-- **No deploy during Phase 0.**
-
-## 15. Observability and error handling [Q]
-
-- `error.tsx` / `not-found.tsx` per route group; global error boundary; typed server-action results; user-visible retry.
-- Structured server logging (`pino` or `console` JSON) with request id; log order placement, payment outcome, auth failures (no PII, no card data).
-- Health route `/api/health` [Q]. Sentry or Vercel Analytics [O].
-
-## 16. Security and privacy [R]
-
-Server-side price/total computation, authorisation on every `userId`-scoped query, input validation, output encoding (React default), rate-limit sign-in [Q], no secrets in repo, `.env.example` only. **No Amazon proprietary scripts, tracking, or session tokens from `recon/` enter the codebase.**
-
-## 17. Key tradeoffs
-
-| Decision | Chosen | Rejected | Cost of choice |
+| Decision | Chosen | Rejected | Cost |
 |---|---|---|---|
-| Framework | Next.js App Router | Vite SPA | Learning curve on RSC boundaries; gains SSR/SEO and route handlers |
-| Data | Postgres + Drizzle | SQLite / JSON files | Needs hosted DB for deploy; best fidelity to real order semantics |
-| State | Server-first + URL | Client store | Slightly more server round-trips |
-| Order progression | Computed from time | Background worker | Not truly stateful, adequate for demo |
-| Payments | Local demo provider | Stripe test | Less realistic, zero setup risk |
-| Search | Interface + simple impl first | Elastic/Algolia | Weaker relevance; fine at demo catalogue size |
+| Module count | 8 deep modules, `product` folded into `catalog`, no `pricing` module | One module per concept (dozens) | A few modules are larger; far less indirection |
+| Framework | Next.js App Router | Vite SPA | RSC learning curve; gains SSR, route handlers |
+| Data | Postgres + Drizzle | SQLite/JSON | Needs a hosted DB to deploy |
+| Order progression | Derived from time | Worker/queue | Not truly stateful; fine for a demo |
+| Payments | Demo provider | Stripe test | Less realistic; zero setup risk |
+| Search | Interface first, simple implementation | Search service | Weaker relevance at demo scale |
 
-## 18. Open architecture questions (need user input or Site Peel)
+## 11. Open questions (need the user or Site Peel)
 
-1. Catalogue source and size (seed ~60 to 150 products, categories, imagery?).
-2. Hosted DB/account for Vercel and domain (user-owned accounts).
-3. Auth library preference (Auth.js vs Better Auth), or "delegated".
-4. GitHub remote for issues/PRs (issue tracker is GitHub Issues; no remote exists).
+1. Catalogue source and size; image source.
+2. Hosted DB and deploy accounts (user-owned).
+3. Auth library (Auth.js vs Better Auth), or "delegated".
+4. GitHub remote for issues and PRs.
+5. Checkout shape and order-detail fields depend on Site Peel captures (`docs/recon/site-peel-request.md`); until then the `checkout` and `orders` interfaces above are provisional.

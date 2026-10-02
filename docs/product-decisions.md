@@ -1,150 +1,159 @@
 # Product decisions
 
-Framework for the decisions a one-day rebuild must make, and where it can show product judgment without changing things just to be different.
+Evidence-based record of where we replicate Amazon and where we deliberately differ. Rules:
 
-Rules:
-- A decision keeps Amazon's behaviour unless there is a concrete reason (user value, accessibility, risk, time). "Observed" cites `docs/recon/`; where Amazon's behaviour is not in the supplied source it says **UNKNOWN / REQUIRES VALIDATION** and the "chosen direction" is a hypothesis.
-- Status: **Proposed** (this document) → **Confirmed** (user agrees, or validated against Site Peel material) → **Shipped** (verified in browser).
-- Chosen directions below are recommendations for Phase 1. None are implemented.
+1. **Default is to replicate** what the supplied source shows. A deviation needs a concrete reason (user value, accessibility, risk, legal, time). Never change something just to look original.
+2. **Where Amazon's behaviour is not in the supplied source, we do not claim to know it.** The entry says `UNKNOWN / REQUIRES VALIDATION` and the decision is **Hold**: replicate once captured; until then any design is provisional and marked as ours.
+3. Every deviation records the same six fields: **Observed Amazon behaviour · Problem/opportunity · Our decision · Why · Tradeoff · How we will validate.**
+4. Status: **Proposed** → **Confirmed** (user agrees, or validated against captured source) → **Shipped** (verified in browser). All entries are currently **Proposed**; none is implemented.
 
-Legend for scope: R = required for assessment, Q = useful for quality, O = optional.
+Evidence references are to `docs/recon/` (page-map, component-inventory, flow-map). Scope tags follow `docs/architecture.md`.
 
----
+## Register
 
-## D1. When to require authentication (R)
-
-- **Problem**: forcing sign-in before checkout loses shoppers; allowing guests complicates order retrieval.
-- **Observed Amazon**: sign-in is identifier-first (email/mobile → password), account creation is folded into the same entry ("Sign in or create account"); Amazon gates checkout behind sign-in (cart works for guests: header shows cart count while logged out). Sign-in step 2 and registration are not captured.
-- **Options**: (a) require sign-in at "Proceed to checkout" like Amazon; (b) guest checkout with optional account creation after; (c) allow everything guest and link orders by email.
-- **Chosen**: (a) for fidelity, but **deferred to the latest necessary moment**: browsing, search, cart are fully guest; guest cart is preserved and merged on sign-in; the sign-in screen at checkout returns the user to the exact checkout step.
-- **Rationale**: matches Amazon expectations; orders need an owner for order retrieval; late auth maximises browse-to-cart conversion.
-- **Tradeoffs**: guest checkout (b) would convert better but requires email-based order lookup and anti-abuse; skipped for time. 
-- **Validation**: E2E: guest adds item → checkout → signs in → lands on address step with cart intact. Confirm Amazon's gate with a checkout capture.
-
-## D2. Search UX (R)
-
-- **Problem**: search is the main entry for intent shoppers; the Amazon header search is dense (60+ departments, suggestion panel).
-- **Observed**: department select + input + submit; rotating placeholder; two-pane autosuggest (`sac-autocomplete`).
-- **Options**: (a) replicate department select + suggestions; (b) single input, department as a results facet; (c) full-text only, no suggestions.
-- **Chosen**: keep Amazon's header pattern (department select + input) because it is part of recognisable structure; implement **suggestions as one list** (recent searches + matching product/category titles); state lives in the URL (`/s?k=…&i=<dept>&…`).
-- **Rationale**: familiar; URL state makes results shareable and testable; single-list suggestions are simpler and more accessible than two panes.
-- **Tradeoffs**: no personalised suggestions; no spelling correction (O).
-- **Validation**: unit (query normalisation, ranking), E2E (type → select suggestion → results), a11y (combobox pattern, `aria-activedescendant`).
-
-## D3. Product discovery on the home page (Q)
-
-- **Problem**: Amazon's home is a 16-card promo deck with no prices; weak for decision-making.
-- **Observed**: promo cards (single and quad), no product prices on the logged-out deck, recently-viewed rail.
-- **Options**: (a) copy the deck; (b) deck + price-bearing product rails ("Top deals", "Recommended"); (c) minimal search-first home.
-- **Chosen**: (b): a hero, 6 to 8 category/promo cards, then **product rails with price, rating and delivery cue** and a "Continue where you left off" rail.
-- **Rationale**: keeps the Amazon feel; shows product value earlier; reuses `ProductCard`.
-- **Tradeoffs**: more data needed on the home route (catalogue must be seeded).
-- **Validation**: Impeccable critique of hierarchy; click-path E2E home → card → PDP.
-
-## D4. Product page hierarchy (R)
-
-- **Problem**: the PDP is the decision point and must expose price, delivery, availability and the buy action without scrolling.
-- **Observed**: **UNKNOWN** (no PDP captured). Amazon's well-known layout is gallery | title/price/details | buy box.
-- **Options**: (a) replicate three columns; (b) two columns with sticky buy box; (c) single column mobile-first.
-- **Chosen (hypothesis)**: (a) on desktop, (c) on mobile with a **sticky add-to-cart bar**; buy box shows price, stock, delivery date, quantity, Add to cart, Buy now in that order.
-- **Rationale**: familiar; sticky bar keeps the primary action reachable.
-- **Tradeoffs**: must be validated against a real PDP capture before building.
-- **Validation**: Site Peel PDP HTML; E2E select variant → quantity → add to cart.
-
-## D5. Cart interaction (R)
-
-- **Problem**: how quickly and clearly the shopper learns their add succeeded, and how editable the cart is.
-- **Observed (CSS only)**: stepper, delete, save for later, subtotal buy-box, out-of-stock alternatives.
-- **Options**: (a) full cart page only; (b) add-to-cart confirmation page; (c) toast + header count + slide-over mini-cart, full cart page for editing.
-- **Chosen**: (c). Toast "Added to cart" with **View cart** action, header count updates optimistically, full cart page supports quantity, remove (with **undo**), save for later (P1).
-- **Rationale**: stay-in-flow add, faster than an interstitial; undo prevents accidental loss.
-- **Tradeoffs**: optimistic updates require reconciliation on failure.
-- **Validation**: unit (cart totals), integration (cart actions), E2E (add, change qty, remove, undo), a11y (live region announcements).
-
-## D6. Checkout simplification (R)
-
-- **Problem**: checkout is the highest-risk step; Amazon shows many steps with upsells.
-- **Observed**: **UNKNOWN**. Amazon's checkout is widely known as a single review page with address/delivery/payment sections.
-- **Options**: (a) multi-step wizard; (b) single page with collapsible sections; (c) one-click.
-- **Chosen**: (b): single page, three sections (Address → Delivery → Payment), sticky order summary, **no upsells in the flow**, inline validation, explicit "Place your order" with totals.
-- **Rationale**: fewer page loads, clear progress, easy to test; removes interruptions.
-- **Tradeoffs**: more state on one page; mitigate with server-validated sections.
-- **Validation**: E2E happy path + declined payment + invalid address; usability check at 360 px.
-
-## D7. Responsive behaviour (R)
-
-- **Problem**: Amazon serves a separate desktop and mobile shell (desktop header `min-width:1000px`).
-- **Observed**: breakpoints at 360/768/1000/1100/1280/1700 (CSS); no mobile DOM.
-- **Options**: (a) duplicate shells; (b) one fluid component tree with Tailwind breakpoints.
-- **Chosen**: (b). Mobile-first; header collapses to logo + search + cart with a drawer for "All"; sub-nav becomes a horizontal scroller.
-- **Rationale**: one codebase to test; fits a day.
-- **Tradeoffs**: less exact parity with Amazon mobile web.
-- **Validation**: browser checklist at 360/768/1280; Playwright viewport projects.
-
-## D8. Empty / loading / error states (Q)
-
-- **Problem**: Amazon's captured assets show a spinner GIF and no designed empty states.
-- **Observed**: spinner `loading-4x-gray.gif`; empty profile values as `--`. Everything else UNKNOWN.
-- **Chosen**: every data view ships **skeleton + empty + error (retry)** variants by default (`loading.tsx`, `error.tsx`, `not-found.tsx`); empty cart, no results and empty orders each offer a next action.
-- **Rationale**: demonstrates product care cheaply; shadcn `Skeleton`, `Alert`.
-- **Tradeoffs**: more states to test; mitigated by a shared `StateBoundary` pattern if repetition warrants (not before).
-- **Validation**: Storybook-less: Playwright with forced failures (route interception) and empty fixtures.
-
-## D9. Account architecture (Q)
-
-- **Problem**: Amazon's account is a 12-tile hub plus 6 grouped lists with page-by-page navigation, no persistent nav.
-- **Observed**: `Your Account` tile grid; Profile Hub; Returns; Help.
-- **Options**: (a) replicate the tile hub; (b) persistent left/side nav (tabs on mobile) for Orders, Addresses, Login & security, Payments.
-- **Chosen**: (a) as the **account home** (recognisable) **plus** a persistent `AccountNavigation` on sub-pages.
-- **Rationale**: keeps the recognisable entry, removes the "back to hub" loop.
-- **Tradeoffs**: small extra layout work.
-- **Validation**: E2E navigation between Orders and Addresses without returning to the hub.
-
-## D10. Trust signals (Q)
-
-- **Problem**: shoppers need to trust price, delivery and returns.
-- **Observed**: returns policy banner (30-day), "Free, easy returns" copy; delivery location in header; star ratings with counts.
-- **Chosen**: surface on PDP/cart/checkout: **total price including shipping before placing the order**, delivery date, return window, secure-payment note, ratings with counts. No fake urgency (no invented "only 2 left", countdowns, "X bought recently").
-- **Rationale**: honest persuasion; avoids dark patterns; legal safety for a demo.
-- **Tradeoffs**: less artificial conversion pressure than Amazon (acceptable).
-- **Validation**: content review in Impeccable critique; unit tests on price/total formatting.
-
-## D11. Accessibility (R)
-
-- **Problem**: Amazon ships skip links and a keyboard-shortcut menu but inconsistent focus styling and empty `alt` on many images.
-- **Observed**: `nav#shortcut-menu`, `role=search`, `aria-label` on controls, `aria-expanded` on toggles; empty image alt in product links.
-- **Chosen**: WCAG 2.2 AA target; skip links, landmarks, labelled controls, meaningful alt, one consistent focus ring, keyboard-operable menus/carousels, live regions for cart changes, reduced motion.
-- **Validation**: axe in Playwright on every key page; manual keyboard pass.
-
-## D12. Performance (Q)
-
-- **Problem**: the captured pages carry 64 MB of JS across 255 files; slow and heavy.
-- **Chosen**: RSC by default, `next/image`, font subsetting, no third-party scripts, lazy-load rails, Lighthouse budget (LCP < 2.5 s, CLS < 0.1 on throttled mobile) on home, search, PDP.
-- **Validation**: Lighthouse CI or manual Lighthouse run per release; bundle-size check.
-
-## D13. Payment realism (R)
-
-- **Problem**: no real money may move; the demo still needs a convincing payment step.
-- **Options**: (a) mocked "Pay" with no card form; (b) card form validated locally with test numbers; (c) Stripe test mode.
-- **Chosen**: (b) behind a `PaymentProvider` interface; (c) is a P2 swap-in.
-- **Rationale**: demonstrates validation and failure states with no third-party dependency risk.
-- **Tradeoffs**: not real; clearly labelled "Demo payment: no card is charged" and never stores full card numbers.
-- **Validation**: unit (Luhn, expiry), integration (declined card path), E2E.
-
-## D14. Logo, brand and imagery (R, needs user)
-
-- **Problem**: Amazon's logo and photos are trademark/copyright protected.
-- **Chosen (proposal)**: placeholder wordmark and an owned/licensed demo catalogue; Amazon-like structure and colours retained.
-- **Needs user decision**: see `docs/recon/asset-inventory.md`.
-
-## D15. Scope boundaries (R)
-
-Explicitly out of scope: Prime membership flows, Alexa/Rufus assistant, ads/sponsored placement, seller/marketplace features, digital content, Fresh/local market, gift-card purchase flow (the Gift Cards page is reference for product-card patterns only), international localisation.
+| ID | Topic | Type | Evidence | Slice |
+|---|---|---|---|---|
+| D1 | Authentication timing | Replicate (gate behaviour UNKNOWN) | Partial | B1 |
+| D2 | Search UX | Replicate + small deviation (single-list suggestions) | Partial | A3, P1-1 |
+| D3 | Home product discovery | Deviation (add priced rails) | Observed (logged-out deck has no prices) | A2 |
+| D4 | Product page hierarchy | **Hold** | None | A4 |
+| D5 | Cart interaction | **Hold** on layout; deviation on feedback (toast + undo) | CSS only | A5 |
+| D6 | Checkout structure | **Hold** | None | A6 |
+| D7 | Responsive strategy | Deviation (one fluid tree) | Observed (desktop header `min-width:1000px`) | A0, B5 |
+| D8 | Loading / empty / error states | Deviation (additive) | Observed (spinner GIF only) | B4 |
+| D9 | Account architecture | Replicate hub + small deviation (persistent nav) | Observed (tile hub) | B3, P1-3 |
+| D10 | Trust signals, no fake urgency | Deviation by omission | Not observed either way | all |
+| D11 | Accessibility | Additive | Observed (skip links, ARIA present; empty alt on product images) | all |
+| D12 | Performance | Additive | Observed (64 MB runtime JS) | P1-7 |
+| D13 | Payment realism | Constraint (no real money) | n/a | A6 |
+| D14 | Logo and imagery | Constraint (legal) | Observed (sprite logo, third-party photos) | A0 |
+| D15 | Scope boundaries | Constraint | n/a | all |
 
 ---
+
+## D1. Authentication timing
+
+- **Observed Amazon behaviour**: sign-in is identifier-first (single email/mobile field → Continue; password on a second step, **not captured**); account creation is part of the same entry ("Sign in or create account"); passkey fields present. Guests see a cart count in the header. Whether Amazon gates at "Proceed to checkout" is **UNKNOWN / REQUIRES VALIDATION** (widely believed, not in source).
+- **Problem/opportunity**: forcing sign-in earlier hurts browsing; allowing anonymous orders complicates retrieval.
+- **Our decision**: browsing, search and cart are guest; the guest cart persists and merges on sign-in; sign-in is required to place an order and returns the user to checkout with the cart intact. In P0-A checkout runs as a guest order (email collected); the gate arrives with B1.
+- **Why**: matches Amazon's visible pattern; late auth maximises browse-to-cart; orders need an owner for retrieval.
+- **Tradeoff**: guest checkout would convert better but needs email-based order lookup and abuse controls; skipped.
+- **Validate**: `cart.mergeGuestCart` and `auth` seam tests; tier-2 auth journey; confirm the gate and step 2 against Site Peel (sign-in step 2, registration).
+
+## D2. Search UX
+
+- **Observed**: header form with department select (60+ options) and text input (`role=searchbox`), rotating placeholder, two-pane autosuggest container. Results page not captured.
+- **Problem/opportunity**: the two-pane suggestion panel is dense and hard to make accessible; results must be shareable and testable.
+- **Our decision**: keep the department select + input pattern. Results state lives in URL params. Suggestions (P1) are one combobox list (recent searches + matching products/categories).
+- **Why**: familiar structure; URL state gives back-button correctness and testable parsing; single list follows the ARIA combobox pattern.
+- **Tradeoff**: no personalised or two-pane suggestions; no spelling correction (P3).
+- **Validate**: `search` seam tests (param round-trip); manual keyboard pass; compare results layout to the Site Peel results capture before building A3.
+
+## D3. Home product discovery
+
+- **Observed**: logged-out home is a 16-card promo deck (single-image and 4-tile cards, one video card), a recently-viewed rail, **no prices or ratings** on the deck. Priced, rated product grids appear on the logged-in "Your Amazon.com" page. Logged-in home is **UNKNOWN**.
+- **Problem/opportunity**: a promo-only deck gives a new visitor nothing to evaluate or add to cart; our catalogue is small and needs to demonstrate the product path quickly.
+- **Our decision**: promo cards (structure replicated) plus at least two product rails showing price, rating and a delivery cue.
+- **Why**: reuses `ProductCard`, shows value earlier, keeps Amazon's recognisable deck.
+- **Tradeoff**: busier home; needs seeded data.
+- **Validate**: Impeccable critique of hierarchy; manual click path home → PDP.
+
+## D4. Product page hierarchy: HOLD
+
+- **Observed**: **UNKNOWN / REQUIRES VALIDATION**. No PDP captured; only the URL pattern `/dp/<id>` and one gift-card product link.
+- **Problem/opportunity**: the PDP is the decision point; price, delivery, availability and the buy action must be visible without hunting.
+- **Our decision**: none yet. Replicate Amazon's PDP structure once captured (A4 depends on the three PDP captures). Provisional hypothesis (ours, not Amazon's): gallery | details | buy box on desktop, single column with sticky add-to-cart on mobile.
+- **Why hold**: designing from memory risks wrong fidelity.
+- **Tradeoff**: A4 is blocked or provisional until source arrives.
+- **Validate**: against the PDP captures; manual variant/quantity/add-to-cart run.
+
+## D5. Cart interaction
+
+- **Observed (CSS only)**: stepper, delete, save for later, subtotal buy-box, out-of-stock alternatives popover, saved-for-later list. Layout, copy and delete/undo behaviour **UNKNOWN**.
+- **Problem/opportunity**: shoppers need immediate confirmation of an add and safe editing.
+- **Our decision**: layout **Hold** until the cart capture arrives. Feedback: toast "Added to cart" with a View cart action, optimistic header count, and **undo after remove** (deviation, additive).
+- **Why**: stays in flow; prevents accidental loss.
+- **Tradeoff**: optimistic updates need reconciliation on failure.
+- **Validate**: `cart` seam tests (restore, clamp); live-region announcement check; cart capture for layout.
+
+## D6. Checkout structure: HOLD
+
+- **Observed**: **UNKNOWN / REQUIRES VALIDATION**. Nothing captured beyond sign-in step 1.
+- **Problem/opportunity**: highest-risk step; must be clear, validated inline, and free of interruptions.
+- **Our decision**: none until the four checkout captures arrive. Provisional (ours): one page with sections Address → Delivery → Payment → Review, sticky summary, no upsells, total shown before placing the order.
+- **Why hold**: replicate Amazon's structure first, then remove friction deliberately.
+- **Tradeoff**: A6 provisional until source arrives.
+- **Validate**: `checkout.placeOrder` seam; tier-1 purchase and failure journeys; 360 px manual run.
+
+## D7. Responsive strategy
+
+- **Observed**: Amazon serves a separate mobile shell; the desktop header enforces `min-width:1000px`; CSS bands near 360/768/1000/1100/1280/1700. No mobile DOM captured.
+- **Problem/opportunity**: two shells double build and test cost.
+- **Our decision**: one fluid component tree, mobile-first, Tailwind breakpoints; mobile header collapses to logo + search + cart with a menu sheet.
+- **Why**: fits the window; one thing to test.
+- **Tradeoff**: less exact parity with Amazon mobile web (mitigated by P1 mobile captures).
+- **Validate**: manual checklist at 360/768/1280; tier-1 journeys on desktop and mobile.
+
+## D8. Loading, empty and error states
+
+- **Observed**: a spinner GIF; empty profile values shown as `--`. Everything else UNKNOWN.
+- **Problem/opportunity**: states are where quality shows; unhandled ones look broken in a demo.
+- **Our decision**: every data route ships skeleton, empty (with a next action) and error (retry) variants; designed 404.
+- **Why**: low cost, high perceived quality.
+- **Tradeoff**: more states to verify; no shared abstraction until repetition appears.
+- **Validate**: forced-failure checks; tier-2 states journey.
+
+## D9. Account architecture
+
+- **Observed**: `Your Account` is a 12-tile hub plus grouped link lists; each tile goes to a separate page; no persistent nav. Sub-pages not captured.
+- **Problem/opportunity**: shoppers bounce back to the hub between tasks.
+- **Our decision**: keep the hub as account home; add a persistent account nav on sub-pages (P1-3).
+- **Why**: recognisable entry, less back-and-forth.
+- **Tradeoff**: small extra layout work.
+- **Validate**: manual navigation Orders ↔ Addresses without returning to the hub.
+
+## D10. Trust signals, no manufactured urgency
+
+- **Observed**: returns-policy banner, delivery location in header, star ratings with counts. Urgency devices (stock/countdown nudges) not captured either way.
+- **Problem/opportunity**: honest persuasion and legal safety for a public demo.
+- **Our decision**: show total price (items, shipping, tax) before placing the order, delivery date, return window and a demo-payment label. No invented scarcity, countdowns or "bought recently" claims.
+- **Why**: trust and no fabricated claims.
+- **Tradeoff**: less conversion pressure than Amazon.
+- **Validate**: content check in Impeccable critique; `checkout.getQuote` tests for displayed totals.
+
+## D11. Accessibility
+
+- **Observed**: skip links, keyboard-shortcut menu, landmarks, `aria-label`s, `aria-expanded` on toggles; empty `alt` on many product images; inconsistent focus styling.
+- **Problem/opportunity**: baseline is good but uneven; we can exceed it cheaply.
+- **Our decision**: WCAG 2.2 AA; one consistent focus ring; meaningful alt text; keyboard-operable menus; live regions for cart changes; reduced motion.
+- **Why**: quality and reviewer signal.
+- **Tradeoff**: ongoing checks per slice.
+- **Validate**: manual keyboard pass per slice; axe on key pages (tier 2).
+
+## D12. Performance
+
+- **Observed**: 255 JS files totalling 64 MB across the captures; heavy third-party and ad scripts.
+- **Problem/opportunity**: a fast demo is itself a quality signal.
+- **Our decision**: server components, `next/image`, font subsetting, no third-party scripts; budget LCP < 2.5 s, CLS < 0.1 on mobile (P1-7).
+- **Why**: measurable, cheap with the stack.
+- **Tradeoff**: none material.
+- **Validate**: Lighthouse mobile on home/results/PDP.
+
+## D13. Payment realism (constraint)
+
+No real money moves. Demo payment provider behind the `payments` port, clearly labelled, no card data stored; Stripe test mode is P2. Validate with `payments` and `checkout` seam tests (approve, decline).
+
+## D14. Logo and imagery (constraint, needs user)
+
+Amazon's logo exists only as a trademarked sprite and the photos are third-party. Proposal: placeholder wordmark and an owned/licensed catalogue; Amazon-like structure and colour kept. See `docs/recon/asset-inventory.md`.
+
+## D15. Scope boundaries (constraint)
+
+Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller features, digital content, Fresh/local market, gift-card purchase (the Gift Cards page is a card-pattern reference only), localisation.
 
 ## Review log
 
 | Date | Decision | Change |
 |---|---|---|
-| 2026-10-02 | all | Proposed in Phase 0; none confirmed by user yet |
+| 2026-10-02 | all | Proposed in Phase 0; Holds on D4, D5 (layout) and D6 until source arrives |
+| 2026-10-02 | all | Restructured to the six-field format; added evidence register |

@@ -1,69 +1,27 @@
-# Amazon rebuild: engineering contract
+# Amazon rebuild
 
-This file is the authoritative engineering contract for this repository. Where another document conflicts with it, this file wins; raise the conflict instead of silently choosing.
+A rebuild of the Amazon shopping experience (Next.js, TypeScript, shadcn/ui) that must show product judgment, not a visual clone.
 
-## Product
+Package manager: `pnpm`. No app is scaffolded yet (Phase 0); standard `pnpm dev|build|lint|test` apply once it is.
 
-- We are rebuilding the Amazon shopping experience. The goal is **not** a superficial visual clone.
-- The product must demonstrate strong product judgment, UX thinking, engineering quality and shipping speed.
-- Reconstruct what Amazon does well; deliberately improve what it does badly. Every deviation from observed Amazon behaviour is recorded in `docs/product-decisions.md` with a rationale. Do not change things just to be different.
-- Phase 0 (planning, recon, architecture, environment) precedes any implementation. Do not build product features until Phase 1 is explicitly started.
+## Always
 
-## UI
+- **Phase 0 until told otherwise**: plan, document, survey. Do not scaffold or write application code until the user unlocks Phase 1.
+- `recon/` is read-only reference material containing a real customer's session data. Never modify it, commit it, or copy values from it (see `docs/recon/privacy-notes.md`).
+- Never disable, replace or overwrite the capture hooks in `.claude/settings.json` / `.claude/hooks/capture.js`; merge new hooks alongside them. Never hand-edit `.agent-logs/`.
+- Do not push, create remotes, deploy, or install dependencies without being asked.
+- Unknown facts about Amazon behaviour are `UNKNOWN / REQUIRES VALIDATION`; never invent them.
 
-- Use **shadcn/ui** wherever an appropriate primitive exists. Prefer existing shadcn primitives over custom recreations.
-- Keep spacing, typography, states, interaction patterns, accessibility and responsive behaviour consistent. Tokens live in one place (`docs/recon/design-tokens.md` defines them; code implements them as CSS variables / Tailwind theme).
-- Do not introduce arbitrary UI libraries when shadcn/ui is sufficient.
-- If a required shadcn component is missing, **identify it and ask before inventing a replacement** when the component materially affects the design.
-- Every interactive component needs default, hover, focus-visible, active, disabled, loading and error states where applicable. Keyboard and screen-reader operation are part of "done".
-- Design quality bar: Impeccable (`.claude/skills/impeccable`). Workflow: critique, direction, implement, audit, browser verification, polish.
+## Where things are (read when relevant)
 
-## Source reconstruction
-
-- `recon/` is supplied Amazon source material (saved pages, CSS, images, scripts). It is **read-only reference**: never modify it, never commit it (it is git-ignored, 90 MB, and contains a logged-in session's identifiers and tokens).
-- Findings from `recon/` live in `docs/recon/`. Read those documents first; do not re-derive structure that is already recorded. Anything not established there is `UNKNOWN / REQUIRES VALIDATION`.
-- More exact source (HTML, CSS, images, SVGs, fonts, icons, page-specific assets) may be supplied through Site Peel. When supplied, use it as the reconstruction reference instead of spending tokens rediscovering structure.
-- Keep **source reconstruction** (what Amazon does) separate from **product improvement** (what we chose to do better).
-- Do not copy implementation details that are unnecessary. Do not copy Amazon's proprietary JavaScript/backend behaviour, tracking, ad scripts, A/B (weblab) machinery or session tokens. Do not introduce legal, security or privacy issues. Rebuild the visual and product intent cleanly.
-- Never put personal data from `recon/` (names, customer IDs, tokens, addresses) into docs, code, fixtures or commits.
-
-## Engineering
-
-- TypeScript with strict mode; no `any` without a written reason.
-- Component-driven architecture; reusable primitives; no unnecessary abstraction; no premature optimisation.
-- Server/client boundaries are deliberate. Default to server components; `"use client"` only where interactivity requires it.
-- Validate at system boundaries (route handlers, server actions, form input, persisted data) with a schema library; trust internal types.
-- Every data-driven view has explicit loading, error and empty states.
-- Accessibility and responsive behaviour (mobile first, then tablet, desktop) are requirements, not polish.
-- Business logic (pricing, cart totals, order state, filtering) is pure, isolated and testable.
-
-## Testing
-
-Adopt test-driven development where practical. Every major feature has:
-
-1. requirement
-2. acceptance criteria
-3. implementation
-4. automated test
-5. browser/manual verification
-6. regression check
-
-"It renders" is not validation. See `docs/testing-strategy.md`.
-
-## Capture system (do not weaken)
-
-Every prompt and final response is captured automatically to `.agent-logs/` by hooks in `.claude/settings.json` running `.claude/hooks/capture.js`. Do not disable, replace or weaken these hooks. Do not hand-edit `.agent-logs/`. When adding hooks or tooling to `.claude/settings.json`, merge; never overwrite the capture entries. `CAPTURE-TEST.md` records the verification.
-
-## Git
-
-- Commit meaningful, scoped changes; no huge mixed commits. No secrets, generated junk, or `recon/`.
-- Do not push, create remotes or deploy without being asked.
-
-## Reference documents
-
-- `docs/recon/README.md`: index of reconstruction findings
-- `docs/product-decisions.md`, `docs/architecture.md`, `docs/testing-strategy.md`, `docs/roadmap.md`
-- `PRODUCT.md`: durable product context for Impeccable
+- Doing any feature work: `docs/agents/workflow.md` (loop, TDD seams, vertical slices)
+- UI work or shadcn components: `docs/ui.md`
+- Module boundaries, data, auth, payments: `docs/architecture.md`
+- Tests and browser verification: `docs/testing-strategy.md`
+- Scope and order of work: `docs/roadmap.md`
+- Why we differ from Amazon: `docs/product-decisions.md`
+- What Amazon source we have: `docs/recon/README.md`; what we still need: `docs/recon/site-peel-request.md`
+- Design context for Impeccable: `PRODUCT.md`
 
 ## Agent skills
 

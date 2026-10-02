@@ -1,77 +1,91 @@
 # Delivery roadmap
 
-Prioritised by demo impact, user value and risk. Complexity: **S** ≤ 1 h, **M** 1 to 3 h, **L** 3 to 6 h (rough, focused-agent hours; to re-estimate at Phase 1 start). Dependencies reference item IDs. Phase 0 is complete when this document and the others are committed; **no item below has been started.**
+Goal: not maximum feature count; a highly convincing, polished, **working** product inside the assessment window (planned as ~24 h). Work is cut into **vertical slices**; the first slice is a **tracer bullet** across the whole purchase path, then each stage thickens it. Order by demo impact, user value and risk.
 
-Gate before any item: its requirement and acceptance criteria are written, and any missing Site Peel evidence it depends on is supplied or explicitly waived.
+Complexity: **S** ≤ 1 h, **M** 1 to 3 h, **L** 3 to 5 h (focused-agent hours, to re-estimate at Phase 1 start). "Source" = Amazon evidence needed (`docs/recon/site-peel-request.md`); where it is missing the slice proceeds with our own design, recorded as such. Tests follow `docs/agents/workflow.md` (agreed seam, RED→GREEN) and `docs/testing-strategy.md` (E2E added after behaviour works).
 
-## P0: Must work for a credible live demo
+Nothing below is started. Phase 1 entry criteria are at the end.
 
-| ID | Feature | User value | Depends on | Acceptance criteria | Cx | Test requirement |
+## P0-A: Demo-critical (the smallest complete end-to-end experience)
+
+```
+home → search → results → product → cart → checkout → confirmation
+```
+
+Guest purchase works first; ownership of orders by an account arrives in P0-B. (Product decision D1 is unchanged: auth at checkout is implemented in P0-B; until then checkout collects an email and creates a guest order.)
+
+| ID | Slice | User value | Depends on | Acceptance criteria | Cx | Test requirement |
 |---|---|---|---|---|---|---|
-| P0-1 | Project scaffold: Next.js, TS strict, Tailwind, shadcn init, lint/format, pnpm, CI script | Foundation | user confirms stack (done), shadcn gaps | `pnpm dev/build/lint/typecheck/test` all pass on empty app; tokens from design-tokens §2 applied | S | smoke test; CI script runs |
-| P0-2 | Design tokens + font substitute + Impeccable direction | Consistent look | P0-1, `PRODUCT.md` | Tokens in CSS vars; type scale; focus ring; Impeccable `shape`/critique direction recorded in `DESIGN.md` | M | visual check; contrast tests |
-| P0-3 | Seeded catalogue + schema + repositories | Real products to browse | P0-1, catalogue decision | ≥ 60 products, 6+ categories, variants, images; seed idempotent | M | repo integration tests |
-| P0-4 | Global shell: header (logo, location, search, account, orders, cart), sub-nav, footer, skip links, responsive | Orientation on every page | P0-2 | Matches page-map shell; works 360 to 1536; keyboard-operable menus | L | RTL + E2E shell; axe |
-| P0-5 | Home page | First impression, entry points | P0-3, P0-4 | Hero + promo cards + ≥ 2 product rails with price/rating; loading/error states | M | E2E home → PDP click path |
-| P0-6 | Search + results page (query, department, pagination, sort, price/rating filters) | Find products | P0-3, P0-4, **Site Peel: results page** | E1/E2 pass; URL-driven; empty-result state | L | unit search domain; integration repo; E1/E2 |
-| P0-7 | Product detail page (gallery, variants, price, stock, delivery, quantity, add to cart, buy now) | Decide and buy | P0-3, **Site Peel: PDP** | E3/E4 pass; out-of-stock disabled with message; sticky mobile bar | L | unit pricing; E3/E4; axe |
-| P0-8 | Cart (add, quantity, remove + undo, subtotal, empty state, persistence incl. guest cookie) | Control what I buy | P0-7, **Site Peel: cart** | E4/E5 pass; guest cart survives reload | L | unit cart; integration cart actions; E5 |
-| P0-9 | Authentication (register, sign in, sign out, protected routes, guest cart merge) | Own my orders | P0-1 | E6/E9 pass; secure cookie; generic error copy | M | integration auth; E6/E9 |
-| P0-10 | Checkout (address, delivery, demo payment, review, place order) | Complete a purchase | P0-8, P0-9, **Site Peel: checkout** | E7 passes; server re-prices; transactional order creation; double-submit safe | L | unit pricing/validation; integration checkout; E7/E10 |
-| P0-11 | Order confirmation + orders list + order detail | Confidence and retrieval | P0-10 | E8 passes; detail uses purchase-time snapshot | M | integration orders authz; E8 |
-| P0-12 | Global states: 404, error, loading skeletons, empty states | Trust, polish | P0-4 | Every data route has skeleton/error/empty; no raw errors shown | M | Playwright forced-failure tests (E10/E11) |
-| P0-13 | Deploy (Vercel + hosted DB + env + seed) | Live demo URL | P0-1..P0-12 | Public URL; E7/E8 pass against production | M | smoke E2E vs prod |
+| A0 | Scaffold, tokens, minimal shell | A running, themed app | stack confirmed; Phase 1 unlock | `pnpm dev/build/lint/typecheck/test` pass; tokens from design-tokens §2 applied; header/footer skeleton renders | M | build + one smoke test |
+| A1 | **Tracer bullet**: 8 to 12 seeded products flow home → search → results → PDP → add to cart → checkout (guest, demo payment) → confirmation, all thin | Proof the whole path works | A0, catalogue decision | A guest completes a purchase and sees an order number; every step uses real module interfaces (`catalog`, `search`, `cart`, `checkout`, `orders`, `payments`) | L | Seam tests for `cart`, `checkout.placeOrder`, `search`; manual browser run; first tier-1 E2E |
+| A2 | Real catalogue (≈40 to 60 products, categories, variants, stock states) and home page with rails | Believable store | A1, product-data decision | Seed idempotent; home shows hero, promo cards and ≥ 2 priced rails; empty/error states | M | catalog seam; manual browser |
+| A3 | Search and results: query, department, sort, price/rating filters, pagination, URL state, no-results state | Find things | A2; source: results page | `/s` driven by params; back button correct; filters combine | L | `search` seam tests (parse round-trip, filters, sort, pagination) |
+| A4 | Product detail: gallery, variants, price, stock, delivery estimate, quantity, add to cart, buy now | Decide and buy | A2; source: PDP (3 states) | Variant changes price/stock/image; out-of-stock disabled with message; mobile sticky bar | L | `catalog` availability; manual a11y/keyboard |
+| A5 | Cart: quantity, remove + undo, subtotal, empty state, guest persistence | Control the purchase | A4; source: cart | Survives reload; totals in cents correct; toast + header count | M | `cart` seam (clamp, merge-ready, restore) |
+| A6 | Checkout: address, delivery, demo payment, review, place order, declined-payment path | Complete the purchase | A5; source: checkout (4 steps) | Server re-prices; atomic order; double submit safe; declined keeps cart | L | `checkout.placeOrder` seam; `payments` demo; tier-1 failure journey |
+| A7 | Order confirmation | Confidence | A6; source: confirmation | Shows order number, items, totals, address matching what was placed | S | `orders.getOrder`; tier-1 purchase journey |
 
-## P1: Strong differentiating quality
+Cut line: if time runs short, A2 shrinks to ~20 products and A3 drops rating filters; A1/A4/A5/A6/A7 do not shrink.
 
-| ID | Feature | User value | Depends on | Acceptance criteria | Cx | Test requirement |
+## P0-B: Credibility (surrounding capabilities that make it a product)
+
+| ID | Slice | User value | Depends on | Acceptance criteria | Cx | Test requirement |
 |---|---|---|---|---|---|---|
-| P1-1 | Search suggestions combobox | Faster search | P0-6 | ARIA combobox pattern; arrow/Enter/Esc; ≤ 8 results; debounced | M | RTL + E1 |
-| P1-2 | Accessibility pass to WCAG 2.2 AA | Inclusive; reviewer signal | P0-* | axe clean on key pages; keyboard pass documented | M | E13 |
-| P1-3 | Mobile excellence (drawer, sticky bars, filters sheet) | Most traffic | P0-4..P0-10 | Browser checklist mobile all green | M | Playwright mobile project |
-| P1-4 | Add-to-cart mini-feedback (toast + header count + undo) polish | Clear feedback | P0-8 | D5 behaviours complete | S | E4/E5 |
-| P1-5 | Address book + account area with persistent navigation | Faster repeat checkout | P0-9, P0-10 | E12 passes; AccountNavigation (D9) | M | integration addresses; E12 |
-| P1-6 | Order status simulation + cancel before shipped | Realistic post-purchase | P0-11 | E14 passes; state machine enforced | M | unit order; E14 |
-| P1-7 | Save for later | Matches Amazon cart | P0-8, **Site Peel: cart** | Move item both ways; persists | S | unit cart; E5 |
-| P1-8 | Performance budget (images, fonts, RSC caching) | Fast demo | P0-* | Lighthouse mobile LCP < 2.5 s, CLS < 0.1 on home/results/PDP | M | Lighthouse run recorded |
-| P1-9 | Deals page with filter bubbles | Discovery depth | P0-3, P0-5 | Filters work; discount % computed from list price | M | unit pricing; E2E deals |
-| P1-10 | Impeccable critique/audit/polish cycle on core pages | Design quality bar | P0-5..P0-11 | Critique findings addressed; audit clean | M | Impeccable audit report committed |
+| B1 | Authentication: identifier-first sign-in, register, sign-out, protected routes, guest→user cart merge, `returnTo` | Own my orders | A5; source: sign-in step 2, registration | Checkout redirects to sign-in and returns with the cart intact | M | `auth` + `cart.mergeGuestCart` seams; tier-2 auth journey |
+| B2 | Orders list and order detail (with status) | Find past orders | A7, B1; source: orders list/detail | User sees only own orders; detail uses purchase snapshot | M | `orders` seam (authz, snapshot, status) |
+| B3 | Account: overview tile hub, address book used at checkout | Faster repeat purchase | B1 | Add/edit/delete/default address; used in checkout | M | `account` seam |
+| B4 | Loading, empty and error states across all data routes | Trust, polish | A-slices | Skeletons, empty-state CTAs, retry on error, designed 404 | M | forced-failure checks; tier-2 states journey |
+| B5 | Responsive shell: mobile header, menu sheet, scrolling sub-nav, footer | Works on phones | A0; source: mobile captures (P1 request) | Browser checklist mobile/tablet green | M | manual checklist |
+| B6 | Deploy (Vercel + hosted DB + env + seed) | Live URL | all above | Public URL completes the purchase journey | M | tier-1 journey against production |
 
-## P2: Polish and depth
+## P1: Differentiation (only after P0-A and P0-B are green)
 
-| ID | Feature | User value | Depends on | Acceptance criteria | Cx | Test requirement |
-|---|---|---|---|---|---|---|
-| P2-1 | Reviews & ratings (list, summary distribution, submit) | Social proof | P0-7 | Seeded reviews; verified-buyer rule for submit | M | integration reviews; E2E |
-| P2-2 | Returns hub + start-return flow (reference: Online Return Center) | Post-purchase completeness | P0-11 | Policy banner, gift lookup, start return from order | M | unit order; E2E |
-| P2-3 | Help hub with searchable articles (reference: Help page) | Support | P0-4 | 8 topics, search, article pages | M | E2E |
-| P2-4 | Stripe test-mode payment | Realism | P0-10 | Swap provider; declined/3DS test cards | M | integration + E2E |
-| P2-5 | Recently viewed + continue-where-you-left-off rail | Retention | P0-7 | Cookie/DB backed rail | S | integration |
-| P2-6 | Visual regression screenshots | Guard UI | P0-* | Baselines for shell, PDP, cart | S | Playwright screenshots |
-| P2-7 | Observability (structured logs, error reporting, health) | Operability | P0-13 | Logs for order/payment/auth; `/api/health` | S | integration |
+| ID | Item | Value | Cx | Notes |
+|---|---|---|---|---|
+| P1-1 | Search suggestions (accessible combobox) | Faster search | M | `popover` + `command` |
+| P1-2 | Richer filtering (facet counts, applied-filter chips, mobile filter sheet) | Better discovery | M | |
+| P1-3 | Polished account experience (persistent account nav, profile) | Product judgment (D9) | M | |
+| P1-4 | Deals page with filter bubbles | Discovery depth | M | Source: rendered deals grid |
+| P1-5 | Improved mobile (sticky bars, gallery swipe, refined sheets) | Most traffic | M | |
+| P1-6 | Accessibility refinement to WCAG 2.2 AA (axe sweep, keyboard pass) | Inclusive; reviewer signal | M | |
+| P1-7 | Performance budget (images, fonts, caching) | Fast demo | M | LCP < 2.5 s, CLS < 0.1 |
+| P1-8 | Richer order simulation (time-derived status, timeline, cancel before shipped) | Realistic post-purchase | M | |
+| P1-9 | Save for later; cart undo polish | Matches Amazon cart | S | |
+| P1-10 | Impeccable cycle on core pages: critique → audit → polish | Design quality bar | M | |
+| P1-11 | E2E tier 2 and 3 journeys | Regression safety | M | |
 
-## P3: Only if significant time remains
+## P2
 
-| ID | Feature | User value | Depends on | Acceptance criteria | Cx | Test requirement |
-|---|---|---|---|---|---|---|
-| P3-1 | Dark mode | Comfort | tokens | Token-driven; AA in both | M | contrast tests |
-| P3-2 | Wishlists / lists | Planning | P0-9 | Create/add/remove | M | E2E |
-| P3-3 | Spelling correction / "did you mean" | Search recovery | P0-6 | Suggests on zero-result | M | unit |
-| P3-4 | Recommendations ("customers also bought") | Discovery | P0-7 | Heuristic by category/co-purchase | M | unit |
-| P3-5 | Coupons, gift cards redemption | Promotions | P0-10 | Code validation, totals update | L | unit pricing |
-| P3-6 | i18n / currency switch | Reach | tokens | At least en + one currency | L | unit formatting |
+Reviews and ratings (list, distribution, submit) · returns hub and start-return flow · help hub with searchable articles · Stripe test-mode payment · recently viewed rail · visual-regression snapshots · structured logging and error reporting.
+
+## P3 (only if significant time remains)
+
+Dark mode · wishlists/lists · spelling correction · recommendations · coupons and gift-card redemption · i18n/currency.
 
 ## Explicitly out of scope
 
-Prime, assistant (Rufus/Alexa+), ads/sponsored, seller portal, digital content, Fresh/local market, real payments, email delivery, push notifications.
+Prime, assistant (Rufus/Alexa+), ads/sponsored, seller portal, digital content, Fresh/local market, real payments, email/push.
+
+## Time budget (24 h, guidance)
+
+| Stage | Hours |
+|---|---|
+| A0 + A1 tracer bullet | 4 |
+| A2 to A7 | 8 |
+| B1 to B6 | 7 |
+| Buffer, verification, fixes | 3 |
+| P1 (best items first) | 2 |
+
+If the budget slips, cut P1 entirely, then B3 and B5 depth, before touching any A slice.
 
 ## Risks (ranked)
 
-1. **Missing source for the money pages** (search, PDP, cart, checkout): building from assumption risks wrong fidelity. Mitigation: Site Peel request in the Phase 0 report; otherwise our own designs recorded as such.
-2. **Catalogue and imagery** decision unmade; image rights. Mitigation: owned/licensed demo images.
-3. **Scope vs. one day**: P0 is 13 items (~35 to 45 h at the estimates above); a single day needs ruthless trimming or parallel agents. Recommend the P0 minimum cut: 1, 2, 3, 4, 7, 8, 10, 11 + guest-only auth stub; mark 5, 6 simplified.
-4. Deployment account/DB access (user-owned).
-5. Logo/trademark.
+1. **Missing Amazon source** for search results, PDP, cart, checkout, orders: building from assumptions risks wrong fidelity. Mitigation: `docs/recon/site-peel-request.md`; otherwise our own designs, recorded as such.
+2. Catalogue content and image rights undecided.
+3. Scope vs. window (mitigated by the cut lines above).
+4. Deploy account/DB access is user-owned.
+5. Logo/trademark decision.
 
 ## Phase 1 entry criteria
 
-User confirms: catalogue/imagery approach, logo approach, font substitute, product-decision proposals (D1 to D15) or edits; Site Peel material for the Critical gaps is supplied or the gap waived; a GitHub remote exists if issues/PRs are wanted.
+The user confirms: catalogue/imagery approach, logo approach, font substitute, and the product-decision proposals (or edits them); Site Peel P0 material is supplied or each gap explicitly waived; a GitHub remote exists if issues/PRs are wanted; and the first test seams (module interfaces in `docs/architecture.md` §3) are agreed.
