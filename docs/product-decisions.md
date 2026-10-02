@@ -221,6 +221,12 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Search** is deterministic: filler words ignored, one-letter typos tolerated for words of 4+ letters, and when no product has every word, products with at least half of the words are shown with an explicit notice. No ranking model.
 - **Touch targets:** 44px for coarse pointers; dense controls drop to 36px for fine pointers (still above the 24px WCAG 2.2 AA minimum).
 
+## D23. Scale-up: managed Postgres in production, synthetic catalogue of about 2,400 products
+
+- **Production database:** Neon (managed Postgres) behind `DATABASE_URL`; PGlite remains for local development and every automated test. Supersedes the "not decided" status in `docs/architecture.md` section 12 and the container-with-volume recipe (kept as the fallback in `docs/deployment.md`).
+- **Catalogue:** overrides the earlier "40 to 60 hand-authored products" default (`docs/catalogue-decision.md`) on the user's explicit instruction. The data is generated deterministically from our own product types, invented brands and attribute vocabularies, and is clearly synthetic. No Amazon data, identifiers or imagery.
+- **Why:** a believable catalogue changes how search, filters, pagination and rails behave, and a real database is a precondition for a live system. Plan, evidence and cut order: `docs/scale-up-plan.md`.
+
 ## Review log
 
 | Date | Decision | Change |

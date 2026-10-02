@@ -1,6 +1,27 @@
 # Deployment
 
-## Decision
+## Decision (current): Vercel + Neon (managed Postgres)
+
+Superseded the earlier "single container with a volume" plan (kept below as the fallback). Reason: the scale-up plan (`docs/scale-up-plan.md`) requires a database that survives redeploys and supports several instances.
+
+- **Database selection** (`src/server/database.ts`, test T48): `DATABASE_URL` set -> managed Postgres through `pg` + `drizzle-orm/node-postgres`, small pool (default 3). Unset -> PGlite (local dev and tests). On Vercel a missing URL is an error, never a silent PGlite.
+- **Migrations and seed run at deploy time**, not on requests: the Vercel build runs `vercel-build` = `tsx scripts/db-setup.ts && next build`. Both steps are idempotent. A failed migration fails the build, so a broken schema never goes live.
+- **Credentials:** `DATABASE_URL` exists only in the Vercel project's environment. `.env.example` lists names only. The setup script prints error messages, never the connection string.
+- **Connection string:** use Neon's *pooled* string (pgbouncer, transaction mode). Checkout's `pg_advisory_xact_lock` is transaction-scoped and works through it. Pick the Neon region closest to the Vercel function region.
+
+### Verified locally against a real PostgreSQL 18 server
+
+`db:setup` applied all migrations and the seed, and re-running it changed nothing (idempotent). The full E2E suite (5 journeys x desktop and mobile) passed against that server, and the users, sessions and orders created by the tests were present in Postgres. A real Neon + Vercel run is still to be verified (see the gate in `docs/scale-up-plan.md`).
+
+### Steps (account owner)
+
+1. Neon: create a project, copy the **pooled** connection string.
+2. Vercel: import the GitHub repository `NITISH-R-G/amazon-clone`, add the environment variable `DATABASE_URL` (Production and Preview), deploy.
+3. Verify the public URL with the gate checklist.
+
+---
+
+## Fallback: one container with a volume (PGlite)
 
 Run **one long-lived Node container with a persistent volume**, keeping PGlite. No database migration, no new driver, no second service.
 
