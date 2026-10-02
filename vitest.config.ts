@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
-    testTimeout: 20_000,
+    // Each test starts its own in-process Postgres (~3 s cold on a loaded machine; several files run in parallel).
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
   },
 });
