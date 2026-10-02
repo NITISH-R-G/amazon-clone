@@ -108,6 +108,8 @@ test("purchase: a guest buys a product, then creates an account and finds the or
   const orderNumber = (await page.getByTestId("order-number").innerText()).trim();
   expect(orderNumber).toMatch(/^AR-/);
   await expect(page.getByTestId("order-total")).toHaveText(total);
+  await expect(page.getByRole("heading", { level: 2, name: "Placed" })).toBeVisible(); // lifecycle: starts as Placed
+  await expect(page.getByText(/Estimated delivery/)).toBeVisible();
   await expect(page.getByText(title).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /0 items in cart/ })).toBeVisible();
 
@@ -122,6 +124,23 @@ test("purchase: a guest buys a product, then creates an account and finds the or
   await page.getByRole("link", { name: new RegExp(orderNumber) }).click();
   await expect(page.getByRole("heading", { level: 1, name: orderNumber })).toBeVisible();
   await expect(page.getByTestId("order-total")).toHaveText(total);
+});
+
+test("lifecycle: a new order can be cancelled before it ships", async ({ page }, info) => {
+  await addFromProductPage(page, pick(info, "fitness-band", "ceramic-table-lamp"));
+  await page.getByRole("link", { name: "Checkout" }).click();
+  await fillShipping(page);
+  await fillCard(page, "4242424242424242");
+  await placeOrder(page);
+
+  await expect(page.getByRole("heading", { level: 2, name: "Placed" })).toBeVisible();
+  await expect(page.getByText(/You can cancel until it ships/)).toBeVisible();
+  await page.getByRole("button", { name: "Cancel order" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name: "Cancelled" })).toBeVisible();
+  await expect(page.getByText(/nothing was charged/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancel order" })).toHaveCount(0);
+  await expect(page.getByText("Order cancelled")).toBeVisible(); // timeline
 });
 
 test("recovery: a declined card keeps the cart and address, and a retry succeeds", async ({ page }, info) => {

@@ -4,7 +4,7 @@ import type { DbOrTx } from "@/lib/db";
 import type { Clock, IdGenerator } from "@/lib/ports";
 import type { CartModule } from "@/modules/cart";
 import type { Catalog } from "@/modules/catalog";
-import type { OrdersModule, Order, ShippingAddress } from "@/modules/orders";
+import type { CancelError, OrdersModule, Order, ShippingAddress } from "@/modules/orders";
 import type { CardInput, PaymentProvider } from "@/modules/payments";
 import type { CheckoutError, Quote } from "../types";
 import { shippingAddressSchema } from "./address";
@@ -20,8 +20,8 @@ export type PlaceOrderInput = {
 export type CheckoutDeps = {
   db: DbOrTx;
   cart: Pick<CartModule, "getCart" | "clearCart">;
-  catalog: Pick<Catalog, "decrementStock">;
-  orders: Pick<OrdersModule, "createOrder" | "findByIdempotencyKey">;
+  catalog: Pick<Catalog, "decrementStock" | "restoreStock">;
+  orders: Pick<OrdersModule, "createOrder" | "findByIdempotencyKey" | "cancelOrder">;
   payments: PaymentProvider;
   clock: Clock;
   ids: IdGenerator;
@@ -102,7 +102,21 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
     }
   }
 
-  return { getQuote, placeOrder };
+  /** Cancels a still-cancellable order and puts its stock back, atomically. Demo payments need no refund. */
+  async function cancelOrder(actor: Actor, orderId: string): Promise<Result<Order, CancelError>> {
+    return db.transaction(async (tx) => {
+      const cancelled = await orders.cancelOrder(actor, orderId, tx);
+      if (cancelled.ok) {
+        await catalog.restoreStock(
+          cancelled.value.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          tx,
+        );
+      }
+      return cancelled;
+    });
+  }
+
+  return { getQuote, placeOrder, cancelOrder };
 }
 
 export type Checkout = ReturnType<typeof createCheckout>;

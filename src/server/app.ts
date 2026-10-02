@@ -27,7 +27,7 @@ export type AppDeps = {
 export function createApp({ db, clock, ids, payments }: AppDeps) {
   const catalog = createCatalog({ db });
   const cart = createCart({ db, catalog });
-  const orders = createOrders({ db });
+  const orders = createOrders({ db, clock });
   const checkout = createCheckout({ db, cart, catalog, orders, payments, clock, ids });
   const search = createSearch({ catalog });
   const auth = createAuth({ db, clock, ids });

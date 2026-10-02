@@ -85,6 +85,17 @@ export function createCatalog({ db }: CatalogDeps) {
       return { inStock: quantity > 0, quantity };
     },
 
+    /** Puts units back (a cancelled order). Pass the caller's `tx` to join its transaction. */
+    async restoreStock(lines: { variantId: string; quantity: number }[], tx?: DbOrTx): Promise<void> {
+      const d = tx ?? db;
+      for (const { variantId, quantity } of lines) {
+        await d
+          .update(variants)
+          .set({ stock: sql`${variants.stock} + ${quantity}` })
+          .where(eq(variants.id, variantId));
+      }
+    },
+
     /** All-or-nothing across lines. Pass the caller's `tx` to join its transaction. */
     async decrementStock(
       lines: { variantId: string; quantity: number }[],

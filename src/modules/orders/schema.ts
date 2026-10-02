@@ -19,6 +19,8 @@ export const orders = pgTable(
     paymentLast4: text("payment_last4").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     placedAt: timestamp("placed_at", { withTimezone: true }).notNull(),
+    /** The only stored lifecycle fact; every other status is derived from `placedAt` and the clock. */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
   (t) => [unique("orders_owner_idempotency").on(t.ownerKey, t.idempotencyKey)],
 );

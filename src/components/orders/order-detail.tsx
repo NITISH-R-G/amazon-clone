@@ -4,7 +4,6 @@ import type { Order } from "@/modules/orders";
 
 const date = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
 export const formatOrderDate = (d: Date) => date.format(d);
-export const statusLabel: Record<Order["status"], string> = { placed: "Placed" };
 
 /** What was bought and paid for, from the purchase-time snapshot. Shared by confirmation and order history. */
 export function OrderDetail({ order }: { order: Order }) {

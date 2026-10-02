@@ -4,14 +4,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { OrderDetail } from "@/components/orders/order-detail";
+import { OrderStatusPanel } from "@/components/orders/order-status";
 import { Button } from "@/components/ui/button";
 import { getApp } from "@/server/runtime";
 import { readActor, readUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Order placed" };
 
-export default async function ConfirmationPage({ params }: PageProps<"/checkout/confirmation/[id]">) {
+export default async function ConfirmationPage({ params, searchParams }: PageProps<"/checkout/confirmation/[id]">) {
   const { id } = await params;
+  const sp = await searchParams;
   const actor = await readActor();
   if (!actor || !z.uuid().safeParse(id).success) notFound();
   const order = await (await getApp()).orders.getOrder(actor, id);
@@ -34,7 +36,14 @@ export default async function ConfirmationPage({ params }: PageProps<"/checkout/
         </p>
       </header>
 
-      <OrderDetail order={order} />
+      <OrderStatusPanel
+        order={order}
+        returnTo={`/checkout/confirmation/${order.id}`}
+        cancelNotice={typeof sp.cancel === "string" ? sp.cancel : undefined}
+      />
+      <div className="border-t pt-10">
+        <OrderDetail order={order} />
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t pt-8">
         {user ? (

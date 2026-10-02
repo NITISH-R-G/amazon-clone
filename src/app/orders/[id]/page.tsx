@@ -2,14 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { formatOrderDate, OrderDetail, statusLabel } from "@/components/orders/order-detail";
+import { formatOrderDate, OrderDetail } from "@/components/orders/order-detail";
+import { OrderStatusPanel } from "@/components/orders/order-status";
 import { getApp } from "@/server/runtime";
 import { readUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Order" };
 
-export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
+export default async function OrderPage({ params, searchParams }: PageProps<"/orders/[id]">) {
   const { id } = await params;
+  const sp = await searchParams;
   const user = await readUser();
   if (!user) redirect(`/sign-in?returnTo=/orders/${encodeURIComponent(id)}`);
   if (!z.uuid().safeParse(id).success) notFound();
@@ -25,11 +27,12 @@ export default async function OrderPage({ params }: PageProps<"/orders/[id]">) {
           </Link>
         </p>
         <h1 className="num text-[28px] leading-9 font-semibold tracking-[-0.02em] sm:text-[32px] sm:leading-[38px]">{order.number}</h1>
-        <p className="num text-muted-foreground">
-          Placed {formatOrderDate(order.placedAt)} · Status: {statusLabel[order.status]}
-        </p>
+        <p className="num text-muted-foreground">Placed {formatOrderDate(order.placedAt)}</p>
       </header>
-      <OrderDetail order={order} />
+      <OrderStatusPanel order={order} returnTo={`/orders/${order.id}`} cancelNotice={typeof sp.cancel === "string" ? sp.cancel : undefined} />
+      <div className="border-t pt-10">
+        <OrderDetail order={order} />
+      </div>
     </div>
   );
 }
