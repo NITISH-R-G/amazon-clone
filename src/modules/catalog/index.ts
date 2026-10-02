@@ -4,6 +4,7 @@ export type { Catalog, CatalogDeps } from "./internal/catalog";
 export type {
   AvailabilityState,
   AttributeDef,
+  AttributeFacet,
   BrandCount,
   Category,
   CategoryCount,
@@ -15,6 +16,7 @@ export type {
   ProductSort,
   ProductSpec,
   TextMatch,
+  TypeCount,
   Variant,
   VariantDetail,
 } from "./types";

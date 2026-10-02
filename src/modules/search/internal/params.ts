@@ -15,6 +15,27 @@ function readAll(input: ParamInput, key: string): string[] {
   return raw.map((v) => v.trim()).filter((v) => v.length > 0 && v.length <= 40).slice(0, MAX_BRANDS);
 }
 
+const SLUG = /^[a-z0-9-]{1,60}$/;
+const ATTRIBUTE_KEY = /^[a-z0-9_]{1,40}$/;
+const MAX_ATTRIBUTE_VALUES = 12;
+
+/** `a.<key>=<value>` parameters, repeated for several values. Anything malformed is dropped. */
+function readAttributes(input: ParamInput): Record<string, string[]> | undefined {
+  const entries: [string, string][] = [];
+  if (input instanceof URLSearchParams) for (const [k, v] of input.entries()) entries.push([k, v]);
+  else for (const [k, v] of Object.entries(input)) for (const one of [v ?? []].flat()) entries.push([k, one]);
+  const out: Record<string, string[]> = {};
+  for (const [name, raw] of entries) {
+    if (!name.startsWith("a.")) continue;
+    const key = name.slice(2);
+    const value = raw.trim();
+    if (!ATTRIBUTE_KEY.test(key) || value.length === 0 || value.length > 60) continue;
+    const list = (out[key] ??= []);
+    if (!list.includes(value) && list.length < MAX_ATTRIBUTE_VALUES) list.push(value);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 const wholeNumber = (v: string | undefined): number | undefined =>
   v !== undefined && /^\d{1,7}$/.test(v) ? Number(v) : undefined;
 
@@ -31,6 +52,8 @@ export function parseSearchParams(input: ParamInput): SearchQuery {
   return {
     text: text || undefined,
     categorySlug: category || undefined,
+    typeSlug: SLUG.test(read(input, "t")?.trim() ?? "") ? read(input, "t")?.trim() : undefined,
+    attributes: readAttributes(input),
     brands: readAll(input, "b").length > 0 ? [...new Set(readAll(input, "b"))] : undefined,
     minPriceCents: min === undefined ? undefined : min * 100,
     maxPriceCents: max === undefined ? undefined : max * 100,
@@ -47,6 +70,8 @@ export function toSearchParams(query: SearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.text) params.set("k", query.text);
   if (query.categorySlug) params.set("c", query.categorySlug);
+  if (query.typeSlug) params.set("t", query.typeSlug);
+  for (const [key, values] of Object.entries(query.attributes ?? {})) for (const value of values) params.append(`a.${key}`, value);
   for (const brand of query.brands ?? []) params.append("b", brand);
   if (query.minPriceCents !== undefined) params.set("min", String(Math.round(query.minPriceCents / 100)));
   if (query.maxPriceCents !== undefined) params.set("max", String(Math.round(query.maxPriceCents / 100)));

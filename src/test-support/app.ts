@@ -7,10 +7,13 @@ import { pgliteExtensions } from "@/lib/pglite";
 import type { PaymentProvider } from "@/modules/payments";
 import { createApp } from "@/server/app";
 import { fakePaymentProvider, fixedClock, fixedIds } from "./fakes";
+import { seedDemoCatalog } from "@/db/seed-demo";
 import { seedFixtures } from "./fixtures";
 import { seedSearchFixtures } from "./search-fixtures";
 
 type Overrides = {
+  /** Seed the full demo catalogue (2,400 products, types and attributes) instead of the small fixtures. */
+  demoCatalog?: boolean;
   clock?: Clock;
   ids?: IdGenerator;
   payments?: PaymentProvider;
@@ -26,7 +29,8 @@ export async function createTestApp(overrides: Overrides = {}) {
   const client = new PGlite({ extensions: pgliteExtensions });
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: "./drizzle" });
-  await seedFixtures(db);
+  if (overrides.demoCatalog) await seedDemoCatalog(db);
+  else await seedFixtures(db);
   if (overrides.searchFixtures) await seedSearchFixtures(db);
   const app = createApp({
     db,

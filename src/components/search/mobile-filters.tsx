@@ -9,12 +9,14 @@ import { FilterControls } from "./filter-controls";
 type Props = {
   categories: { slug: string; name: string; count: number }[];
   brands: { name: string; count: number }[];
+  types: { slug: string; name: string; count: number }[];
+  attributes: { key: string; label: string; values: { value: string; count: number }[] }[];
   total: number;
   activeCount: number;
 };
 
 /** Filters in a bottom sheet for small screens; same controls and URL state as the desktop sidebar. */
-export function MobileFilters({ categories, brands, total, activeCount }: Props) {
+export function MobileFilters({ categories, brands, types, attributes, total, activeCount }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -29,7 +31,7 @@ export function MobileFilters({ categories, brands, total, activeCount }: Props)
           <SheetTitle className="text-lg">Filters</SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto p-4">
-          <FilterControls categories={categories} brands={brands} />
+          <FilterControls categories={categories} brands={brands} types={types} attributes={attributes} />
         </div>
         <SheetFooter className="border-t p-4">
           <Button size="lg" className="w-full" onClick={() => setOpen(false)}>

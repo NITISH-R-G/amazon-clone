@@ -186,6 +186,29 @@ test("variants: choosing colour and storage resolves a real variant that survive
   await expect(page.getByTestId("order-total")).toHaveText(total);
 });
 
+test("structured search: a department leads to a product type whose own attributes narrow the results", async ({ page }, info) => {
+  test.skip(isMobile(info), "the desktop sidebar is exercised here; the mobile sheet shares the same controls");
+  await page.goto("/s?c=electronics");
+  const filters = page.getByRole("complementary", { name: "Filters" });
+  await filters.getByRole("link", { name: /Smartphones/ }).click();
+  await expect(page).toHaveURL(/t=smartphones/);
+  await expect(page.getByRole("heading", { level: 1, name: "Smartphones" })).toBeVisible();
+
+  // Attributes appear because the type declares them; they are not hard-coded filters.
+  await expect(filters.getByRole("heading", { name: "Refresh rate" })).toBeVisible();
+  await expect(filters.getByRole("heading", { name: "Display size" })).toBeVisible();
+  const before = Number((await page.getByRole("status").first().innerText()).replace(/\D/g, ""));
+  await filters.getByText("120 Hz", { exact: false }).first().click();
+  await expect(page).toHaveURL(/a\.refresh_rate=120/);
+  await expect(page.getByRole("list", { name: "Applied filters" }).getByText("Refresh rate: 120 Hz")).toBeVisible();
+  await expect.poll(async () => Number((await page.getByRole("status").first().innerText()).replace(/\D/g, ""))).toBeLessThan(before);
+
+  // A different type brings a different set of attributes (laptops have an operating system, no phone display sizes).
+  await page.goto("/s?c=electronics&t=laptops");
+  await expect(filters.getByRole("heading", { name: "Operating system" })).toBeVisible();
+  await expect(filters.getByRole("heading", { name: "Display size" })).toHaveCount(0);
+});
+
 test("lifecycle: a new order can be cancelled before it ships", async ({ page }, info) => {
   await addFromProductPage(page, pick(info, "fitness-band", "ceramic-table-lamp"));
   await page.getByRole("link", { name: "Checkout" }).click();

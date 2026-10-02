@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, sql, type SQL } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
-import { categories, products, variants } from "../schema";
-import type { BrandCount, CategoryCount, Product, ProductCriteria, ProductPage, TextMatch } from "../types";
+import { attributeDefs, categories, productTypes, products, variants } from "../schema";
+import type { AttributeFacet, BrandCount, CategoryCount, Product, ProductCriteria, ProductPage, TextMatch, TypeCount } from "../types";
 
 const MAX_TOKENS = 8;
 const MAX_TOKEN_LENGTH = 32;
@@ -69,15 +69,33 @@ type Filters = Omit<ProductCriteria, "sort" | "page" | "pageSize">;
  * All filters except the ones named in `skip` (facets ignore their own filter).
  * `textIds`: product ids already matched by a fuzzy text query, so the trigram scan runs once, not once per query.
  */
-function conditions(f: Filters, skip: "category" | "brand" | null = null, textIds?: string[]): SQL[] {
+type Scope = {
+  /** undefined: no type asked for; null: a type slug that does not exist (nothing matches). */
+  typeId?: string | null;
+  /** The facet attribute keys of that type: the only attribute filters that are honoured. */
+  facetKeys: Set<string>;
+  textIds?: string[];
+};
+type Skip = { category?: boolean; brand?: boolean; type?: boolean; attribute?: string };
+
+function conditions(f: Filters, scope: Scope, skip: Skip = {}): SQL[] {
   const out: SQL[] = [];
+  const { textIds } = scope;
   if (textIds) out.push(textIds.length > 0 ? inArray(products.id, textIds) : sql`false`);
   else if (f.text) {
     const text = textCondition(f.text);
     if (text) out.push(text);
   }
-  if (skip !== "category" && f.categorySlug) out.push(eq(categories.slug, f.categorySlug));
-  if (skip !== "brand" && f.brands && f.brands.length > 0) out.push(inArray(products.brand, f.brands));
+  if (!skip.category && f.categorySlug) out.push(eq(categories.slug, f.categorySlug));
+  if (!skip.brand && f.brands && f.brands.length > 0) out.push(inArray(products.brand, f.brands));
+  if (!skip.type && scope.typeId !== undefined) {
+    out.push(scope.typeId === null ? sql`false` : eq(products.typeId, scope.typeId));
+    // Attribute filters belong to the type: they only apply while the type does.
+    for (const [key, values] of Object.entries(f.attributes ?? {})) {
+      if (!scope.facetKeys.has(key) || skip.attribute === key || values.length === 0) continue;
+      out.push(sql`(${products.attributes} ->> ${key}) in (${sql.join(values.map((v) => sql`${v}`), sql`, `)})`);
+    }
+  }
   if (f.minPriceCents !== undefined) out.push(sql`${MIN_PRICE} >= ${f.minPriceCents}`);
   if (f.maxPriceCents !== undefined) out.push(sql`${MIN_PRICE} <= ${f.maxPriceCents}`);
   if (f.minRating !== undefined) out.push(gte(products.ratingTenths, Math.round(f.minRating * 10)));
@@ -138,13 +156,28 @@ export function createFind({ db }: { db: DbOrTx }) {
     const pageSize = Math.min(Math.max(1, Math.floor(criteria.pageSize)), MAX_PAGE_SIZE);
     const base = d.select({ id: products.id }).from(products).leftJoin(categories, eq(products.categoryId, categories.id));
 
-    let textIds: string[] | undefined;
+    // The type, if one is asked for, and its facet attributes (the only ones a filter may name).
+    let typeId: string | null | undefined;
+    let facetDefs: { key: string; label: string; values: string[] }[] = [];
+    if (criteria.typeSlug) {
+      const [type] = await d.select({ id: productTypes.id }).from(productTypes).where(eq(productTypes.slug, criteria.typeSlug)).limit(1);
+      typeId = type?.id ?? null;
+      if (type) {
+        facetDefs = await d
+          .select({ key: attributeDefs.key, label: attributeDefs.label, values: attributeDefs.values })
+          .from(attributeDefs)
+          .where(and(eq(attributeDefs.typeId, type.id), eq(attributeDefs.facet, true), eq(attributeDefs.role, "spec")))
+          .orderBy(asc(attributeDefs.position));
+      }
+    }
+    const scope: Scope = { typeId, facetKeys: new Set(facetDefs.map((f) => f.key)) };
+
     if (criteria.text && criteria.text.mode !== "all") {
       const matched = await base.where(textCondition(criteria.text));
-      textIds = matched.map((r) => r.id);
+      scope.textIds = matched.map((r) => r.id);
     }
 
-    const where = and(...conditions(criteria, null, textIds));
+    const where = and(...conditions(criteria, scope));
     const [{ total }] = await d
       .select({ total: count() })
       .from(products)
@@ -154,7 +187,7 @@ export function createFind({ db }: { db: DbOrTx }) {
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
     const page = Math.min(Math.max(1, Math.floor(criteria.page)), pageCount);
 
-    const [idRows, categoryRows, brandRows] = await Promise.all([
+    const [idRows, categoryRows, brandRows, typeRows, attributeRows] = await Promise.all([
       total === 0
         ? Promise.resolve([] as { id: string }[])
         : base
@@ -167,7 +200,7 @@ export function createFind({ db }: { db: DbOrTx }) {
             .select({ slug: categories.slug, name: categories.name, count: count() })
             .from(products)
             .innerJoin(categories, eq(products.categoryId, categories.id))
-            .where(and(...conditions(criteria, "category", textIds)))
+            .where(and(...conditions(criteria, scope, { category: true })))
             .groupBy(categories.slug, categories.name, categories.position)
             .orderBy(asc(categories.position), asc(categories.name))
         : Promise.resolve([] as { slug: string; name: string; count: number }[]),
@@ -176,11 +209,36 @@ export function createFind({ db }: { db: DbOrTx }) {
             .select({ name: products.brand, count: count() })
             .from(products)
             .leftJoin(categories, eq(products.categoryId, categories.id))
-            .where(and(...conditions(criteria, "brand", textIds)))
+            .where(and(...conditions(criteria, scope, { brand: true })))
             .groupBy(products.brand)
             .orderBy(desc(count()), asc(products.brand))
             .limit(BRAND_FACET_LIMIT)
         : Promise.resolve([] as { name: string; count: number }[]),
+      withFacets
+        ? d
+            .select({ slug: productTypes.slug, name: productTypes.name, count: count() })
+            .from(products)
+            .innerJoin(productTypes, eq(products.typeId, productTypes.id))
+            .leftJoin(categories, eq(products.categoryId, categories.id))
+            .where(and(...conditions(criteria, scope, { type: true })))
+            .groupBy(productTypes.slug, productTypes.name, productTypes.position)
+            .orderBy(asc(productTypes.position))
+        : Promise.resolve([] as { slug: string; name: string; count: number }[]),
+      // One grouped count per facet attribute of the type, each ignoring its own filter.
+      withFacets && typeId
+        ? Promise.all(
+            facetDefs.map(async (def) => {
+              const value = sql<string>`(${products.attributes} ->> ${def.key})`;
+              const rows = await d
+                .select({ value, count: count() })
+                .from(products)
+                .leftJoin(categories, eq(products.categoryId, categories.id))
+                .where(and(...conditions(criteria, scope, { attribute: def.key }), sql`${value} is not null`))
+                .groupBy(sql`1`); // by position: the same key bound twice would be two different expressions
+              return { def, counts: new Map(rows.map((r) => [r.value, Number(r.count)])) };
+            }),
+          )
+        : Promise.resolve([] as { def: { key: string; label: string; values: string[] }; counts: Map<string, number> }[]),
     ]);
 
     const ids = idRows.map((r) => r.id);
@@ -201,6 +259,22 @@ export function createFind({ db }: { db: DbOrTx }) {
 
     const toCategory = (r: { slug: string; name: string; count: number }): CategoryCount => ({ slug: r.slug, name: r.name, count: Number(r.count) });
     const toBrand = (r: { name: string; count: number }): BrandCount => ({ name: r.name, count: Number(r.count) });
-    return { products: items, total: Number(total), page, facets: { categories: categoryRows.map(toCategory), brands: brandRows.map(toBrand) } };
+    const toType = (r: { slug: string; name: string; count: number }): TypeCount => ({ slug: r.slug, name: r.name, count: Number(r.count) });
+    const attributes: AttributeFacet[] = attributeRows
+      .map(({ def, counts }) => {
+        const selected = criteria.attributes?.[def.key] ?? [];
+        // Vocabulary order; a value with no products is shown only when it is selected (so it can be removed).
+        const values = def.values
+          .map((value) => ({ value, count: counts.get(value) ?? 0 }))
+          .filter((v) => v.count > 0 || selected.includes(v.value));
+        return { key: def.key, label: def.label, values };
+      })
+      .filter((f) => f.values.length > 0);
+    return {
+      products: items,
+      total: Number(total),
+      page,
+      facets: { categories: categoryRows.map(toCategory), brands: brandRows.map(toBrand), types: typeRows.map(toType), attributes },
+    };
   }
 }

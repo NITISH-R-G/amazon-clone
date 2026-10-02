@@ -24,9 +24,13 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
   const allCategories = result.items.length === 0 ? await app.catalog.listCategories() : [];
 
   const categoryName = result.facets.categories.find((c) => c.slug === query.categorySlug)?.name;
-  const heading = query.text ? `Results for "${query.text}"` : (categoryName ?? (query.onSale ? "On sale" : "All products"));
+  const typeName = result.facets.types.find((t) => t.slug === query.typeSlug)?.name;
+  const attributeLabels = Object.fromEntries(result.facets.attributes.map((f) => [f.key, f.label]));
+  const heading = query.text ? `Results for "${query.text}"` : (typeName ?? categoryName ?? (query.onSale ? "On sale" : "All products"));
   const activeCount = [
     query.categorySlug,
+    query.typeSlug,
+    query.attributes && Object.keys(query.attributes).length > 0,
     query.brands && query.brands.length > 0,
     query.minPriceCents !== undefined || query.maxPriceCents !== undefined,
     query.minRating,
@@ -47,17 +51,17 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           </p>
         </div>
         <div className="flex w-full items-center gap-3 sm:w-auto">
-          {showFilters ? <MobileFilters categories={result.facets.categories} brands={result.facets.brands} total={result.total} activeCount={activeCount} /> : null}
+          {showFilters ? <MobileFilters categories={result.facets.categories} brands={result.facets.brands} types={result.facets.types} attributes={result.facets.attributes} total={result.total} activeCount={activeCount} /> : null}
           <SortControl value={query.sort} />
         </div>
       </div>
 
-      <AppliedFilters query={query} categoryName={categoryName} />
+      <AppliedFilters query={query} categoryName={categoryName} typeName={typeName} attributeLabels={attributeLabels} />
 
       <div className={showFilters ? "grid gap-10 lg:grid-cols-[13.5rem_minmax(0,1fr)]" : ""}>
         {showFilters ? (
           <aside aria-label="Filters" className="hidden lg:block">
-            <FilterControls categories={result.facets.categories} brands={result.facets.brands} />
+            <FilterControls categories={result.facets.categories} brands={result.facets.brands} types={result.facets.types} attributes={result.facets.attributes} />
           </aside>
         ) : null}
         <div>

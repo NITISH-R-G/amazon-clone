@@ -5,10 +5,29 @@ import { toSearchParams, type SearchQuery } from "@/modules/search";
 type Chip = { label: string; clear: Partial<SearchQuery> };
 
 /** Applied filters as removable chips (plain links, so they work without JS). */
-export function AppliedFilters({ query, categoryName }: { query: SearchQuery; categoryName?: string }) {
+export function AppliedFilters({
+  query,
+  categoryName,
+  typeName,
+  attributeLabels = {},
+}: {
+  query: SearchQuery;
+  categoryName?: string;
+  typeName?: string;
+  attributeLabels?: Record<string, string>;
+}) {
   const chips: Chip[] = [];
   if (query.text) chips.push({ label: `"${query.text}"`, clear: { text: undefined } });
   if (query.categorySlug) chips.push({ label: categoryName ?? query.categorySlug, clear: { categorySlug: undefined } });
+  if (query.typeSlug) chips.push({ label: typeName ?? query.typeSlug, clear: { typeSlug: undefined, attributes: undefined } });
+  for (const [key, values] of Object.entries(query.attributes ?? {})) {
+    for (const value of values) {
+      const rest = values.filter((v) => v !== value);
+      const attributes = { ...query.attributes, [key]: rest };
+      if (rest.length === 0) delete attributes[key];
+      chips.push({ label: `${attributeLabels[key] ?? key}: ${value}`, clear: { attributes: Object.keys(attributes).length > 0 ? attributes : undefined } });
+    }
+  }
   for (const brand of query.brands ?? []) {
     chips.push({ label: brand, clear: { brands: (query.brands ?? []).filter((b) => b !== brand) } });
   }

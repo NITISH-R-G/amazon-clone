@@ -78,6 +78,13 @@
       "when": 1790964233605,
       "tag": "0010_order_item_variant_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790964234605,
+      "tag": "0011_attribute_search",
+      "breakpoints": true
     }
   ]
 }

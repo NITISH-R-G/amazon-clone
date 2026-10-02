@@ -60,6 +60,10 @@ export type TextMatch = { tokens: string[]; mode: "all" | "fuzzy" | "partial"; i
 export type ProductCriteria = {
   text?: TextMatch;
   categorySlug?: string;
+  /** A product type (smartphones, sofas): brings its own attribute facets. */
+  typeSlug?: string;
+  /** Selected attribute values by key; only facet attributes of `typeSlug` are honoured, the rest are ignored. */
+  attributes?: Record<string, string[]>;
   brands?: string[];
   minPriceCents?: Cents;
   maxPriceCents?: Cents;
@@ -76,6 +80,8 @@ export type ProductCriteria = {
 
 export type CategoryCount = { slug: string; name: string; count: number };
 export type BrandCount = { name: string; count: number };
+export type TypeCount = { slug: string; name: string; count: number };
+export type AttributeFacet = { key: string; label: string; values: { value: string; count: number }[] };
 
 export type ProductPage = {
   products: Product[];
@@ -83,7 +89,7 @@ export type ProductPage = {
   /** The page actually returned (after clamping). */
   page: number;
   /** Counts that ignore their own filter, so a facet shows what choosing it would give. */
-  facets: { categories: CategoryCount[]; brands: BrandCount[] };
+  facets: { categories: CategoryCount[]; brands: BrandCount[]; types: TypeCount[]; attributes: AttributeFacet[] };
 };
 
 export type AttributeDef = {

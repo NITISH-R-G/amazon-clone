@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils";
 
 type CategoryFacet = { slug: string; name: string; count: number };
 type BrandFacet = { name: string; count: number };
+type TypeFacet = { slug: string; name: string; count: number };
+type AttributeFacet = { key: string; label: string; values: { value: string; count: number }[] };
 
-const BRANDS_SHOWN = 6;
+const SHOWN = 6;
 
 const PRICE_BUCKETS = [
   { key: "any", label: "Any price" },
@@ -27,17 +29,70 @@ function priceKeyOf(params: URLSearchParams): string {
   return PRICE_BUCKETS.find((b) => ("min" in b ? b.min : undefined) === min && ("max" in b ? b.max : undefined) === max)?.key ?? "any";
 }
 
+const rowClass = "flex min-h-11 items-center gap-3 text-sm lg:min-h-9";
+
+/** A checkbox group: the first few options, the rest behind "Show all". Selected options always come first. */
+function FacetGroup({
+  id,
+  title,
+  options,
+  selected,
+  onToggle,
+}: {
+  id: string;
+  title: string;
+  options: { value: string; count: number }[];
+  selected: string[];
+  onToggle: (value: string, checked: boolean) => void;
+}) {
+  // A selected value stays listed even when the other filters leave it with no products.
+  const listed = [...options, ...selected.filter((s) => !options.some((o) => o.value === s)).map((value) => ({ value, count: 0 }))];
+  const rows = [...listed.filter((o) => selected.includes(o.value)), ...listed.filter((o) => !selected.includes(o.value))];
+  if (rows.length === 0) return null;
+  const row = (o: { value: string; count: number }) => (
+    <div key={o.value} className={rowClass}>
+      <Checkbox id={`${id}-${o.value}`} checked={selected.includes(o.value)} onCheckedChange={(checked) => onToggle(o.value, checked === true)} />
+      <Label htmlFor={`${id}-${o.value}`} className="min-h-11 flex-1 cursor-pointer justify-between text-sm font-normal lg:min-h-9">
+        <span>{o.value}</span>
+        <span className="num text-xs text-muted-foreground">{o.count}</span>
+      </Label>
+    </div>
+  );
+  return (
+    <section aria-labelledby={`${id}-title`} className="space-y-1">
+      <h2 id={`${id}-title`} className="mb-1 text-sm font-semibold">
+        {title}
+      </h2>
+      {rows.slice(0, SHOWN).map(row)}
+      {rows.length > SHOWN ? (
+        <details className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm text-muted-foreground hover:text-foreground lg:min-h-9">
+            <span className="group-open:hidden">Show all ({rows.length})</span>
+            <span className="hidden group-open:inline">Show fewer</span>
+          </summary>
+          {rows.slice(SHOWN).map(row)}
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
 /**
  * Filters for the results page. State lives in the URL: every change navigates (page resets to 1),
- * so results are shareable and the back button works.
+ * so results are shareable and the back button works. Attribute filters are not hard-coded: they are
+ * whatever the selected product type declares as facets.
  */
 export function FilterControls({
   categories,
   brands,
+  types,
+  attributes,
   onNavigate,
 }: {
   categories: CategoryFacet[];
   brands: BrandFacet[];
+  types: TypeFacet[];
+  attributes: AttributeFacet[];
   onNavigate?: () => void;
 }) {
   const router = useRouter();
@@ -45,58 +100,38 @@ export function FilterControls({
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const hrefWith = (changes: Record<string, string | null>) => {
+  const href = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params.toString());
-    for (const [k, v] of Object.entries(changes)) {
-      if (v === null) next.delete(k);
-      else next.set(k, v);
-    }
+    mutate(next);
     next.delete("page");
     const qs = next.toString();
     return qs ? `${pathname}?${qs}` : pathname;
   };
+  const clearAttributes = (next: URLSearchParams) => {
+    for (const key of [...next.keys()]) if (key.startsWith("a.")) next.delete(key);
+  };
+  const navigate = (mutate: (next: URLSearchParams) => void) =>
+    startTransition(() => {
+      router.push(href(mutate), { scroll: false });
+      onNavigate?.();
+    });
   const go = (changes: Record<string, string | null>) =>
-    startTransition(() => {
-      router.push(hrefWith(changes), { scroll: false });
-      onNavigate?.();
+    navigate((next) => {
+      for (const [k, v] of Object.entries(changes)) {
+        if (v === null) next.delete(k);
+        else next.set(k, v);
+      }
     });
-
-  const selectedBrands = params.getAll("b");
-  const toggleBrand = (name: string, checked: boolean) =>
-    startTransition(() => {
-      const next = new URLSearchParams(params.toString());
-      next.delete("b");
-      const updated = checked ? [...selectedBrands, name] : selectedBrands.filter((b) => b !== name);
-      for (const b of updated) next.append("b", b);
-      next.delete("page");
-      const qs = next.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-      onNavigate?.();
+  const toggleMany = (key: string, value: string, checked: boolean) =>
+    navigate((next) => {
+      const current = next.getAll(key);
+      next.delete(key);
+      for (const v of checked ? [...current, value] : current.filter((c) => c !== value)) next.append(key, v);
     });
-  // A selected brand stays listed even when the other filters leave it with no products.
-  const listed: BrandFacet[] = [
-    ...brands,
-    ...selectedBrands.filter((s) => !brands.some((b) => b.name === s)).map((name) => ({ name, count: 0 })),
-  ];
-  // Selected brands first, so a choice is never hidden behind "Show all brands".
-  const brandRows = [...listed.filter((b) => selectedBrands.includes(b.name)), ...listed.filter((b) => !selectedBrands.includes(b.name))];
-  const brandRow = (b: BrandFacet) => (
-    <div key={b.name} className={rowClass}>
-      <Checkbox
-        id={`brand-${b.name}`}
-        checked={selectedBrands.includes(b.name)}
-        onCheckedChange={(checked) => toggleBrand(b.name, checked === true)}
-      />
-      <Label htmlFor={`brand-${b.name}`} className="min-h-11 flex-1 cursor-pointer justify-between text-sm font-normal lg:min-h-9">
-        <span>{b.name}</span>
-        <span className="num text-xs text-muted-foreground">{b.count}</span>
-      </Label>
-    </div>
-  );
 
   const currentCategory = params.get("c");
+  const currentType = params.get("t");
   const priceKey = priceKeyOf(params);
-  const rowClass = "flex min-h-11 items-center gap-3 text-sm lg:min-h-9";
 
   return (
     <div className={cn("space-y-7", pending && "opacity-70 transition-opacity")} aria-busy={pending}>
@@ -107,7 +142,11 @@ export function FilterControls({
         <ul>
           <li>
             <Link
-              href={hrefWith({ c: null })}
+              href={href((n) => {
+                n.delete("c");
+                n.delete("t");
+                clearAttributes(n);
+              })}
               aria-current={!currentCategory ? "true" : undefined}
               className={cn(rowClass, "justify-between", !currentCategory ? "font-semibold" : "text-muted-foreground hover:text-foreground")}
               onClick={onNavigate}
@@ -118,7 +157,11 @@ export function FilterControls({
           {categories.map((c) => (
             <li key={c.slug}>
               <Link
-                href={hrefWith({ c: c.slug })}
+                href={href((n) => {
+                  n.set("c", c.slug);
+                  n.delete("t");
+                  clearAttributes(n);
+                })}
                 aria-current={currentCategory === c.slug ? "true" : undefined}
                 className={cn(rowClass, "justify-between", currentCategory === c.slug ? "font-semibold" : "text-muted-foreground hover:text-foreground")}
                 onClick={onNavigate}
@@ -131,23 +174,64 @@ export function FilterControls({
         </ul>
       </section>
 
-      {brandRows.length > 0 ? (
-        <section aria-labelledby="f-brand" className="space-y-1">
-          <h2 id="f-brand" className="mb-1 text-sm font-semibold">
-            Brand
+      {types.length > 1 || currentType ? (
+        <section aria-labelledby="f-type" className="space-y-1">
+          <h2 id="f-type" className="mb-1 text-sm font-semibold">
+            Type
           </h2>
-          {brandRows.slice(0, BRANDS_SHOWN).map(brandRow)}
-          {brandRows.length > BRANDS_SHOWN ? (
-            <details className="group">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm text-muted-foreground hover:text-foreground lg:min-h-9">
-                <span className="group-open:hidden">Show all brands</span>
-                <span className="hidden group-open:inline">Show fewer</span>
-              </summary>
-              {brandRows.slice(BRANDS_SHOWN).map(brandRow)}
-            </details>
-          ) : null}
+          <ul>
+            {currentType ? (
+              <li>
+                <Link
+                  href={href((n) => {
+                    n.delete("t");
+                    clearAttributes(n);
+                  })}
+                  className={cn(rowClass, "justify-between text-muted-foreground hover:text-foreground")}
+                  onClick={onNavigate}
+                >
+                  All types
+                </Link>
+              </li>
+            ) : null}
+            {types.map((t) => (
+              <li key={t.slug}>
+                <Link
+                  href={href((n) => {
+                    n.set("t", t.slug);
+                    clearAttributes(n);
+                  })}
+                  aria-current={currentType === t.slug ? "true" : undefined}
+                  className={cn(rowClass, "justify-between", currentType === t.slug ? "font-semibold" : "text-muted-foreground hover:text-foreground")}
+                  onClick={onNavigate}
+                >
+                  <span>{t.name}</span>
+                  <span className="num text-xs font-normal text-muted-foreground">{t.count}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
+
+      {attributes.map((facet) => (
+        <FacetGroup
+          key={facet.key}
+          id={`attr-${facet.key}`}
+          title={facet.label}
+          options={facet.values}
+          selected={params.getAll(`a.${facet.key}`)}
+          onToggle={(value, checked) => toggleMany(`a.${facet.key}`, value, checked)}
+        />
+      ))}
+
+      <FacetGroup
+        id="brand"
+        title="Brand"
+        options={brands.map((b) => ({ value: b.name, count: b.count }))}
+        selected={params.getAll("b")}
+        onToggle={(value, checked) => toggleMany("b", value, checked)}
+      />
 
       <section aria-labelledby="f-price" className="space-y-1">
         <h2 id="f-price" className="mb-1 text-sm font-semibold">
@@ -206,11 +290,7 @@ export function FilterControls({
           { key: "sale", label: "On sale" },
         ].map((o) => (
           <div key={o.key} className={rowClass}>
-            <Checkbox
-              id={`f-${o.key}`}
-              checked={params.get(o.key) === "1"}
-              onCheckedChange={(checked) => go({ [o.key]: checked ? "1" : null })}
-            />
+            <Checkbox id={`f-${o.key}`} checked={params.get(o.key) === "1"} onCheckedChange={(checked) => go({ [o.key]: checked ? "1" : null })} />
             <Label htmlFor={`f-${o.key}`} className="min-h-11 flex-1 cursor-pointer text-sm font-normal lg:min-h-9">
               {o.label}
             </Label>

@@ -52,7 +52,7 @@ function summarise(product: Product, categoryName: string | null): ProductSummar
   };
 }
 
-const EMPTY_FACETS = { categories: [], brands: [] };
+const EMPTY_FACETS = { categories: [], brands: [], types: [], attributes: [] };
 
 export function createSearch({ catalog }: SearchDeps) {
   /**
@@ -91,6 +91,8 @@ export function createSearch({ catalog }: SearchDeps) {
       query,
       {
         categorySlug: query.categorySlug,
+        typeSlug: query.typeSlug,
+        attributes: query.attributes,
         brands: query.brands,
         minPriceCents: query.minPriceCents,
         maxPriceCents: query.maxPriceCents,
