@@ -4,7 +4,6 @@ import { useActionState, useEffect, useRef } from "react";
 import { placeOrderAction } from "@/app/actions";
 import type { FormState } from "@/app/form-state";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatUsd } from "@/lib/money";
@@ -58,7 +57,52 @@ type Summary = {
   totalCents: number;
 };
 
-export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: string; summary: Summary }) {
+function SummaryLines({ summary }: { summary: Summary }) {
+  return (
+    <>
+      <ul className="space-y-1.5 text-sm">
+        {summary.lines.map((l) => (
+          <li key={l.id} className="num flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {l.quantity} × {l.title}
+            </span>
+            <span>{formatUsd(l.lineTotalCents)}</span>
+          </li>
+        ))}
+      </ul>
+      <dl className="num space-y-2 border-t border-input pt-3 text-[15px]">
+        <div className="flex justify-between">
+          <dt>Items</dt>
+          <dd>{formatUsd(summary.subtotalCents)}</dd>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <dt>Shipping</dt>
+          <dd>{summary.shippingCents === 0 ? "Free" : formatUsd(summary.shippingCents)}</dd>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <dt>Estimated tax</dt>
+          <dd>{formatUsd(summary.taxCents)}</dd>
+        </div>
+        <div className="flex justify-between border-t border-input pt-3 text-lg font-semibold">
+          <dt>Order total</dt>
+          <dd>{formatUsd(summary.totalCents)}</dd>
+        </div>
+      </dl>
+    </>
+  );
+}
+
+type Defaults = Partial<Record<"name" | "contactEmail", string>>;
+
+export function CheckoutForm({
+  idempotencyKey,
+  summary,
+  defaults,
+}: {
+  idempotencyKey: string;
+  summary: Summary;
+  defaults?: Defaults;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(placeOrderAction, {});
   const errorRef = useRef<HTMLParagraphElement>(null);
 
@@ -83,7 +127,7 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
           placeholder={f.placeholder}
           maxLength={f.maxLength}
           required={!f.optional}
-          defaultValue={state.values?.[f.name]}
+          defaultValue={state.values?.[f.name] ?? defaults?.[f.name as keyof Defaults]}
           onChange={f.format ? (e) => (e.target.value = f.format!(e.target.value)) : undefined}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
@@ -98,72 +142,70 @@ export function CheckoutForm({ idempotencyKey, summary }: { idempotencyKey: stri
   };
 
   return (
-    <form action={action} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]" noValidate>
+    <form action={action} className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-14" noValidate>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <input type="hidden" name="country" value="US" />
 
-      <div className="space-y-4">
+      <div className="space-y-10">
+        <details className="group rounded-xl bg-muted lg:hidden">
+          <summary className="num flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[15px] font-medium">
+            <span>Order summary</span>
+            <span className="font-semibold">{formatUsd(summary.totalCents)}</span>
+          </summary>
+          <div className="space-y-3 px-4 pb-4">
+            <SummaryLines summary={summary} />
+          </div>
+        </details>
+
         {state.error ? (
           <p
             ref={errorRef}
             tabIndex={-1}
             role="alert"
-            className="rounded-md border border-destructive/40 bg-card p-3 text-sm font-medium text-destructive outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+            className="rounded-lg border border-destructive/40 p-4 text-sm font-medium text-destructive outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
           >
             {state.error}
           </p>
         ) : null}
 
-        <Card className="gap-4 p-4">
-          <h2 className="text-lg font-bold">1. Shipping address</h2>
-          <p className="text-sm text-muted-foreground">Demo store: shipping within the United States only.</p>
+        <section aria-labelledby="shipping-heading" className="space-y-4">
+          <div className="space-y-1">
+            <h2 id="shipping-heading" className="text-lg font-semibold">
+              Shipping address
+            </h2>
+            <p className="text-sm text-muted-foreground">Demo store: shipping within the United States only.</p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">{addressFields.map(renderField)}</div>
-        </Card>
+        </section>
 
-        <Card className="gap-4 p-4">
-          <h2 className="text-lg font-bold">2. Payment</h2>
-          <p className="text-sm text-muted-foreground">
-            Demo payment: no card is charged. Use 4242 4242 4242 4242 to succeed, or 4000 0000 0000 0002 to see a decline.
-          </p>
+        <section aria-labelledby="payment-heading" className="space-y-4 border-t pt-10">
+          <div className="space-y-1">
+            <h2 id="payment-heading" className="text-lg font-semibold">
+              Payment
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Demo payment: no card is charged. Use 4242 4242 4242 4242 to succeed, or 4000 0000 0000 0002 to see a decline.
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">{cardFields.map(renderField)}</div>
-        </Card>
+        </section>
       </div>
 
-      <Card className="h-fit gap-3 p-4 lg:sticky lg:top-4">
-        <h2 className="text-lg font-bold">Order summary</h2>
-        <ul className="space-y-1 text-sm">
-          {summary.lines.map((l) => (
-            <li key={l.id} className="flex justify-between gap-2">
-              <span className="min-w-0 truncate">
-                {l.quantity} × {l.title}
-              </span>
-              <span>{formatUsd(l.lineTotalCents)}</span>
-            </li>
-          ))}
-        </ul>
-        <dl className="space-y-1 border-t pt-3 text-sm">
-          <div className="flex justify-between">
-            <dt>Items</dt>
-            <dd>{formatUsd(summary.subtotalCents)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Shipping</dt>
-            <dd>{summary.shippingCents === 0 ? "Free" : formatUsd(summary.shippingCents)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt>Estimated tax</dt>
-            <dd>{formatUsd(summary.taxCents)}</dd>
-          </div>
-          <div className="flex justify-between border-t pt-2 text-lg font-semibold">
-            <dt>Order total</dt>
-            <dd>{formatUsd(summary.totalCents)}</dd>
-          </div>
-        </dl>
+      <aside aria-label="Order summary" className="hidden h-fit space-y-4 rounded-xl bg-muted p-6 lg:sticky lg:top-6 lg:block">
+        <h2 className="text-lg font-semibold">Order summary</h2>
+        <SummaryLines summary={summary} />
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending ? "Placing your order..." : `Place your order · ${formatUsd(summary.totalCents)}`}
         </Button>
-        <p className="text-xs text-muted-foreground">You will not be charged: this is a demo.</p>
-      </Card>
+        <p className="text-sm text-muted-foreground">You will not be charged: this is a demo.</p>
+      </aside>
+
+      <div className="space-y-3 lg:hidden">
+        <Button type="submit" size="lg" className="w-full" disabled={pending}>
+          {pending ? "Placing your order..." : `Place your order · ${formatUsd(summary.totalCents)}`}
+        </Button>
+        <p className="text-sm text-muted-foreground">You will not be charged: this is a demo.</p>
+      </div>
     </form>
   );
 }
