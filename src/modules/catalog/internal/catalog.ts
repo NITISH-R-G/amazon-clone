@@ -1,8 +1,21 @@
 import { and, asc, eq, gte, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import { err, ok, type Result } from "@/lib/result";
-import { products, variants } from "../schema";
-import type { Product, VariantDetail } from "../types";
+import { categories, products, variants } from "../schema";
+import type { AvailabilityState, Category, Product, VariantDetail } from "../types";
+
+/** Out of stock at 0, low stock from 1 to 5, otherwise in stock. */
+export function availabilityState(stock: number): AvailabilityState {
+  if (stock <= 0) return "out_of_stock";
+  return stock <= 5 ? "low_stock" : "in_stock";
+}
+
+type ProductRow = typeof products.$inferSelect;
+
+function toProduct(row: ProductRow, rows: Product["variants"]): Product {
+  const { ratingTenths, ...rest } = row;
+  return { ...rest, rating: ratingTenths / 10, variants: rows };
+}
 
 export type CatalogDeps = { db: DbOrTx };
 
@@ -23,7 +36,7 @@ export function createCatalog({ db }: CatalogDeps) {
         .from(variants)
         .where(eq(variants.productId, product.id))
         .orderBy(asc(variants.id));
-      return { ...product, variants: rows };
+      return toProduct(product, rows);
     },
 
     async listProducts(tx?: DbOrTx): Promise<Product[]> {
@@ -31,7 +44,16 @@ export function createCatalog({ db }: CatalogDeps) {
       const rows = await d.select().from(products).orderBy(asc(products.title));
       if (rows.length === 0) return [];
       const all = await d.select().from(variants).orderBy(asc(variants.id));
-      return rows.map((p) => ({ ...p, variants: all.filter((v) => v.productId === p.id) }));
+      return rows.map((p) =>
+        toProduct(
+          p,
+          all.filter((v) => v.productId === p.id),
+        ),
+      );
+    },
+
+    async listCategories(tx?: DbOrTx): Promise<Category[]> {
+      return (tx ?? db).select().from(categories).orderBy(asc(categories.position), asc(categories.name));
     },
 
     async getVariant(id: string, tx?: DbOrTx): Promise<VariantDetail | null> {

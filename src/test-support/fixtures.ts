@@ -1,8 +1,12 @@
 import type { Database } from "@/server/app";
-import { products, variants } from "@/db/schema";
+import { categories, products, variants } from "@/db/schema";
 
 /** Test fixtures per docs/tracer-bullet.md. Inserted directly; not a mock. */
 export async function seedFixtures(db: Database) {
+  await db.insert(categories).values([
+    { id: "cat-kitchen", slug: "kitchen", name: "Kitchen", position: 1 },
+    { id: "cat-home", slug: "home", name: "Home", position: 2 },
+  ]);
   await db.insert(products).values([
     {
       id: "prod-kettle",
@@ -11,6 +15,10 @@ export async function seedFixtures(db: Database) {
       brand: "Testco",
       description: "A kettle for tests.",
       images: [{ url: "/products/kettle.svg", alt: "Test Kettle" }],
+      categoryId: "cat-kitchen",
+      ratingTenths: 45,
+      ratingCount: 120,
+      bullets: ["Boils in minutes"],
     },
     {
       id: "prod-mug",
@@ -19,6 +27,7 @@ export async function seedFixtures(db: Database) {
       brand: "Testco",
       description: "A mug for tests.",
       images: [{ url: "/products/mug.svg", alt: "Test Mug" }],
+      categoryId: "cat-kitchen",
     },
   ]);
   await db.insert(variants).values([

@@ -5,6 +5,7 @@ import { createCart } from "@/modules/cart";
 import { createCatalog } from "@/modules/catalog";
 import { createCheckout } from "@/modules/checkout";
 import { createOrders } from "@/modules/orders";
+import { createSearch } from "@/modules/search";
 import type { PaymentProvider } from "@/modules/payments";
 
 /**
@@ -27,7 +28,8 @@ export function createApp({ db, clock, ids, payments }: AppDeps) {
   const cart = createCart({ db, catalog });
   const orders = createOrders({ db });
   const checkout = createCheckout({ db, cart, catalog, orders, payments, clock, ids });
-  return { db, catalog, cart, orders, checkout };
+  const search = createSearch({ catalog });
+  return { db, catalog, cart, orders, checkout, search };
 }
 
 export type App = ReturnType<typeof createApp>;
