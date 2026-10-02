@@ -21,7 +21,7 @@ export function SortControl({ value }: { value: string }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
       <Label htmlFor="sort" className="text-sm text-muted-foreground">
         Sort
       </Label>
@@ -35,7 +35,7 @@ export function SortControl({ value }: { value: string }) {
           startTransition(() => router.push(p.toString() ? `${pathname}?${p}` : pathname, { scroll: false }));
         }}
       >
-        <SelectTrigger id="sort" className="min-w-44" aria-busy={pending}>
+        <SelectTrigger id="sort" className="min-w-0 flex-1 sm:min-w-44 sm:flex-none" aria-busy={pending}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="end">

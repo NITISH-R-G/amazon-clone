@@ -13,7 +13,7 @@ export function QuickAdd({ variantId, title }: { variantId: string; title: strin
   return (
     <form action={action}>
       <input type="hidden" name="variantId" value={variantId} />
-      <Button type="submit" variant="outline" size="sm" className="h-11 sm:h-9" disabled={pending}>
+      <Button type="submit" variant="outline" size="sm" className="h-11 pointer-fine:h-9" disabled={pending}>
         {added ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}
         {pending ? "Adding" : added ? "Added" : "Add"}
         <span className="sr-only"> {title} to cart</span>

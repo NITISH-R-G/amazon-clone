@@ -93,14 +93,14 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
         </Empty>
       ) : (
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-14">
-          <ul className="divide-y border-y">
+          <ul className="h-fit divide-y border-y">
             {cart.lines.map((line) => (
               <li key={line.id} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4 py-6 sm:grid-cols-[7rem_minmax(0,1fr)_auto]">
-                <Link href={`/dp/${line.productSlug}`} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+                <Link href={`/dp/${line.productSlug}`} tabIndex={-1} aria-hidden="true" className="relative aspect-square overflow-hidden rounded-lg bg-muted">
                   {line.imageUrl ? <Image src={line.imageUrl} alt="" fill unoptimized sizes="112px" className="object-contain p-2" /> : null}
                 </Link>
                 <div className="min-w-0 space-y-3">
-                  <Link href={`/dp/${line.productSlug}`} className="line-clamp-2 text-[15px] leading-5 font-medium hover:underline">
+                  <Link href={`/dp/${line.productSlug}`} className="relative line-clamp-2 text-[15px] leading-5 font-medium before:absolute before:inset-x-0 before:-inset-y-3 before:content-[''] hover:underline">
                     {line.title}
                   </Link>
                   <PriceBlock cents={line.unitPriceCents} listCents={line.listPriceCents} size="sm" />
@@ -113,7 +113,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                     <CartQuantityForm lineId={line.id} quantity={line.quantity} />
                     <form action={removeItemAction}>
                       <input type="hidden" name="lineId" value={line.id} />
-                      <Button type="submit" variant="destructive" size="sm" className="h-11 sm:h-9">
+                      <Button type="submit" variant="destructive" size="sm" className="h-11 pointer-fine:h-9">
                         Remove<span className="sr-only"> {line.title}</span>
                       </Button>
                     </form>

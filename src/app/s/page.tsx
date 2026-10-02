@@ -33,6 +33,9 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
     query.onSale,
   ].filter(Boolean).length;
 
+  // With nothing found and nothing to remove, filters have nothing to narrow.
+  const showFilters = result.total > 0 || activeCount > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -42,18 +45,20 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
             {result.total} {result.total === 1 ? "product" : "products"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <MobileFilters categories={result.facets.categories} total={result.total} activeCount={activeCount} />
+        <div className="flex w-full items-center gap-3 sm:w-auto">
+          {showFilters ? <MobileFilters categories={result.facets.categories} total={result.total} activeCount={activeCount} /> : null}
           <SortControl value={query.sort} />
         </div>
       </div>
 
       <AppliedFilters query={query} categoryName={categoryName} />
 
-      <div className="grid gap-10 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
-        <aside aria-label="Filters" className="hidden lg:block">
-          <FilterControls categories={result.facets.categories} />
-        </aside>
+      <div className={showFilters ? "grid gap-10 lg:grid-cols-[13.5rem_minmax(0,1fr)]" : ""}>
+        {showFilters ? (
+          <aside aria-label="Filters" className="hidden lg:block">
+            <FilterControls categories={result.facets.categories} />
+          </aside>
+        ) : null}
         <div>
           {result.relaxed && result.items.length > 0 ? (
             <p role="status" className="mb-6 rounded-lg bg-muted px-4 py-3 text-sm">
@@ -62,6 +67,7 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           ) : null}
           {result.items.length > 0 ? (
             <>
+              <h2 className="sr-only">Products</h2>
               <ProductGrid products={result.items} dense />
               <ResultsPagination query={query} page={result.page} pageCount={result.pageCount} />
             </>

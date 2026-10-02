@@ -22,13 +22,13 @@ async function headerData() {
  */
 export async function SiteHeader() {
   const { categories, count, user } = await headerData();
-  const strip = "flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground";
+  const strip = "flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground";
   return (
     <header className="border-b bg-background">
       <div className="mx-auto grid max-w-[1280px] grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:grid-cols-[auto_minmax(0,36rem)_auto] lg:justify-between lg:px-8">
         <div className="flex items-center gap-1">
           <MobileMenu categories={categories} userName={user?.name ?? null} />
-          <Link href="/" className="text-xl font-semibold tracking-tight">
+          <Link href="/" className="flex min-h-11 items-center text-xl font-semibold tracking-tight">
             Cartly
           </Link>
         </div>
@@ -56,7 +56,7 @@ export async function SiteHeader() {
         </nav>
         <Link
           href="/cart"
-          className="relative flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-medium"
+          className="relative flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium"
         >
           <ShoppingBag aria-hidden="true" className="size-5" />
           <span className="hidden sm:inline">Cart</span>

@@ -33,7 +33,7 @@ export function AppliedFilters({ query, categoryName }: { query: SearchQuery; ca
         <li key={c.label}>
           <Link
             href={hrefWithout(c.clear)}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-input px-3 text-sm transition-colors duration-150 hover:bg-muted"
+            className="inline-flex min-h-11 pointer-fine:min-h-9 items-center gap-1.5 rounded-md border border-input px-3 text-sm transition-colors duration-150 hover:bg-muted"
           >
             {c.label}
             <X aria-hidden="true" className="size-3.5" />

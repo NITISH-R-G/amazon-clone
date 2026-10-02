@@ -12,7 +12,7 @@ function Rail({ title, href, products }: { title: string; href: string; products
         <h2 id={`rail-${title}`} className="text-2xl leading-8 font-semibold tracking-[-0.015em]">
           {title}
         </h2>
-        <Link href={href} className="text-sm font-medium underline underline-offset-4 hover:text-muted-foreground">
+        <Link href={href} className="flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-muted-foreground">
           View all
         </Link>
       </div>
