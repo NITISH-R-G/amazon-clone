@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { placeOrderAction } from "@/app/actions";
+import { placeOrderAction, startCheckoutAction } from "@/app/actions";
 import type { FormState } from "@/app/form-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,12 +98,16 @@ export function CheckoutForm({
   idempotencyKey,
   summary,
   defaults,
+  mode = "demo",
 }: {
+  mode?: "demo" | "stripe";
   idempotencyKey: string;
   summary: Summary;
   defaults?: Defaults;
 }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(placeOrderAction, {});
+  const [state, action, pending] = useActionState<FormState, FormData>(mode === "stripe" ? startCheckoutAction : placeOrderAction, {});
+  const stripe = mode === "stripe";
+  const cta = stripe ? "Continue to payment" : "Place your order";
   const errorRef = useRef<HTMLParagraphElement>(null);
 
   // After a failed submit, bring the error into view and announce it.
@@ -178,6 +182,11 @@ export function CheckoutForm({
           <div className="grid gap-4 sm:grid-cols-2">{addressFields.map(renderField)}</div>
         </section>
 
+        {stripe ? (
+          <p className="border-t pt-10 text-sm text-muted-foreground">
+            Next you will pay securely with Stripe (test mode). Your items are held for 15 minutes while you pay.
+          </p>
+        ) : (
         <section aria-labelledby="payment-heading" className="space-y-4 border-t pt-10">
           <div className="space-y-1">
             <h2 id="payment-heading" className="text-lg font-semibold">
@@ -189,22 +198,23 @@ export function CheckoutForm({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{cardFields.map(renderField)}</div>
         </section>
+        )}
       </div>
 
       <aside aria-label="Order summary" className="hidden h-fit space-y-4 rounded-xl bg-muted p-6 lg:sticky lg:top-6 lg:block">
         <h2 className="text-lg font-semibold">Order summary</h2>
         <SummaryLines summary={summary} />
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Placing your order..." : `Place your order · ${formatUsd(summary.totalCents)}`}
+          {pending ? "Please wait..." : `${cta} · ${formatUsd(summary.totalCents)}`}
         </Button>
-        <p className="text-sm text-muted-foreground">You will not be charged: this is a demo.</p>
+        <p className="text-sm text-muted-foreground">{stripe ? "Stripe test mode: no real money moves." : "You will not be charged: this is a demo."}</p>
       </aside>
 
       <div className="space-y-3 lg:hidden">
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? "Placing your order..." : `Place your order · ${formatUsd(summary.totalCents)}`}
+          {pending ? "Please wait..." : `${cta} · ${formatUsd(summary.totalCents)}`}
         </Button>
-        <p className="text-sm text-muted-foreground">You will not be charged: this is a demo.</p>
+        <p className="text-sm text-muted-foreground">{stripe ? "Stripe test mode: no real money moves." : "You will not be charged: this is a demo."}</p>
       </div>
     </form>
   );

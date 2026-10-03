@@ -237,6 +237,15 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
     return { order, payment: await payments.getByOrder(orderId) };
   }
 
+  /** What the payment page needs: the order, its payment and (Stripe) the client secret for the Payment Element. */
+  async function getPaymentSession(actor: Actor, orderId: string): Promise<(OrderView & { clientSecret: string | null }) | null> {
+    const view = await getOrderView(actor, orderId);
+    if (!view) return null;
+    if (view.order.paidAt || view.order.cancelledAt || view.order.status === "expired") return { ...view, clientSecret: null };
+    const payment = await payments.ensureForOrder({ orderId, amountCents: view.order.totalCents });
+    return { order: view.order, payment, clientSecret: payment.clientSecret };
+  }
+
   /** Demo bank only: the customer's card goes to the demo provider, which answers with events we then handle. */
   async function attemptDemoPayment(
     actor: Actor,
@@ -348,7 +357,7 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
     return view ? ok(view.order) : err("PAYMENT_DECLINED");
   }
 
-  return { getQuote, startCheckout, handlePaymentEvent, getOrderView, attemptDemoPayment, syncPayment, cancelOrder, retryRefund, placeOrder };
+  return { getQuote, startCheckout, getPaymentSession, handlePaymentEvent, getOrderView, attemptDemoPayment, syncPayment, cancelOrder, retryRefund, placeOrder };
 }
 
 export type Checkout = ReturnType<typeof createCheckout>;

@@ -118,6 +118,38 @@ function safeValues(formData: FormData): Record<string, string> {
   return values;
 }
 
+const startSchema = placeOrderSchema.omit({ cardNumber: true, expiry: true, cvc: true });
+
+/** Stripe flow, step 1: validate the address, hold the stock, create the payment, then go to the payment page. */
+export async function startCheckoutAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const values = safeValues(formData);
+  const parsed = startSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const flat = z.flattenError(parsed.error).fieldErrors;
+    const fieldErrors: Record<string, string> = {};
+    for (const [key, messages] of Object.entries(flat)) if (messages?.[0]) fieldErrors[key] = messages[0];
+    return { error: "Please correct the highlighted fields.", fieldErrors, values };
+  }
+  const actor = await readActor();
+  if (!actor) return { error: checkoutMessages.EMPTY_CART, values };
+  const d = parsed.data;
+  const app = await getApp();
+  const result = await app.checkout.startCheckout(actor, {
+    address: { name: d.name, line1: d.line1, line2: d.line2 || undefined, city: d.city, region: d.region, postalCode: d.postalCode, country: d.country.toUpperCase() },
+    contactEmail: d.contactEmail,
+    idempotencyKey: d.idempotencyKey,
+  });
+  if (!result.ok) {
+    const messages: Record<string, string> = {
+      ...checkoutMessages,
+      CART_CHANGED: "Your cart changed. Review it and start checkout again.",
+      ORDER_CLOSED: "This checkout was cancelled. Start again from your cart.",
+    };
+    return { error: messages[result.error] ?? "We could not start checkout.", values };
+  }
+  redirect(`/checkout/pay/${result.value.order.id}`);
+}
+
 export async function placeOrderAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const values = safeValues(formData);
   const parsed = placeOrderSchema.safeParse(Object.fromEntries(formData));
@@ -149,4 +181,30 @@ export async function placeOrderAction(_prev: FormState, formData: FormData): Pr
   if (!result.ok) return { error: checkoutMessages[result.error] ?? "We could not place your order.", values };
   revalidatePath("/", "layout");
   redirect(`/checkout/confirmation/${result.value.id}`);
+}
+
+/** Demo flow, payment page: the card goes to the demo bank, which answers like a provider would. */
+export async function payDemoOrderAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = z
+    .object({ orderId: z.uuid(), cardNumber: required("Card number", 25), expiry: required("Expiry (MM/YY)", 7), cvc: required("Security code", 4) })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Enter your card number, expiry and security code." };
+  const actor = await readActor();
+  if (!actor) return { error: checkoutMessages.EMPTY_CART };
+  const app = await getApp();
+  const result = await app.checkout.attemptDemoPayment(actor, parsed.data.orderId, {
+    number: parsed.data.cardNumber,
+    expiry: parsed.data.expiry,
+    cvc: parsed.data.cvc,
+  });
+  if (!result.ok) {
+    const messages: Record<string, string> = {
+      ...checkoutMessages,
+      NOT_FOUND: "We could not find this checkout.",
+      NOT_PAYABLE: "This checkout was cancelled. Start again from your cart.",
+    };
+    return { error: messages[result.error] ?? "We could not process this payment." };
+  }
+  revalidatePath("/", "layout");
+  redirect(`/checkout/confirmation/${parsed.data.orderId}`);
 }

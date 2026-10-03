@@ -73,6 +73,7 @@ export default async function CheckoutPage() {
         )}
       </header>
       <CheckoutForm
+        mode={app.payments.provider.kind}
         idempotencyKey={crypto.randomUUID()}
         summary={{ lines: cart.lines, ...quote.value }}
         defaults={user ? { name: user.name, contactEmail: user.email } : undefined}

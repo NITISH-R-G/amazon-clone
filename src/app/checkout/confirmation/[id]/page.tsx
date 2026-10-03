@@ -16,8 +16,30 @@ export default async function ConfirmationPage({ params, searchParams }: PagePro
   const sp = await searchParams;
   const actor = await readActor();
   if (!actor || !z.uuid().safeParse(id).success) notFound();
-  const order = await (await getApp()).orders.getOrder(actor, id);
+  const app = await getApp();
+  // Returning from Stripe is not proof of payment: ask the provider (server side) and let checkout decide.
+  const view = await app.checkout.syncPayment(actor, id);
+  const order = view?.order;
   if (!order) notFound();
+  if (!order.paidAt) {
+    const failed = view?.payment?.status === "failed";
+    const ended = Boolean(order.cancelledAt) || order.status === "expired";
+    return (
+      <div className="mx-auto max-w-xl space-y-4 py-12">
+        <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.02em]">{failed ? "Payment not completed" : ended ? "Checkout ended" : "Confirming your payment"}</h1>
+        <p role="status" className="text-muted-foreground">
+          {failed
+            ? "Your payment did not go through and you have not been charged."
+            : ended
+              ? "This checkout is no longer open. Nothing was charged."
+              : "We are waiting for confirmation from the payment provider. This usually takes a few seconds: refresh this page."}
+        </p>
+        <Button asChild>
+          <Link href={ended ? "/cart" : `/checkout/pay/${order.id}`}>{ended ? "Back to cart" : failed ? "Try again" : "Back to payment"}</Link>
+        </Button>
+      </div>
+    );
+  }
   const user = await readUser();
 
   return (

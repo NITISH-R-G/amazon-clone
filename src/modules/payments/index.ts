@@ -1,6 +1,7 @@
 // Public interface of the payments module. Import only from here.
 export { createDemoProvider } from "./internal/demo-provider";
 export { createPayments } from "./internal/payments";
+export { createStripeProvider, declineMessage, mapStripeEvent } from "./internal/stripe-provider";
 export type { PaymentRecord, PaymentsDeps, PaymentsService, RefundRecord } from "./internal/payments";
 export { applyPaymentEvent } from "./internal/state";
 export { validateCardFormat } from "./internal/card";

@@ -1,6 +1,6 @@
 import { seedDemoCatalog } from "@/db/seed-demo";
 import { createSystemIds, systemClock } from "@/lib/ports";
-import { createDemoProvider } from "@/modules/payments";
+import { createDemoProvider, createStripeProvider } from "@/modules/payments";
 import { createApp, type App } from "./app";
 import { openDatabase } from "./database";
 
@@ -20,7 +20,10 @@ async function init(): Promise<App> {
     db: handle.db,
     clock: systemClock,
     ids,
-    payments: createDemoProvider({ clock: systemClock, ids }),
+    // Stripe (test mode) when its secret key is configured; the demo bank otherwise (local dev, tests).
+    payments: process.env.STRIPE_SECRET_KEY
+      ? createStripeProvider({ secretKey: process.env.STRIPE_SECRET_KEY, webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? null })
+      : createDemoProvider({ clock: systemClock, ids }),
   });
 }
 
