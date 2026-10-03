@@ -6,3 +6,4 @@ export * from "@/modules/orders/schema";
 export * from "@/modules/auth/schema";
 export * from "@/modules/payments/schema";
 export * from "@/modules/discovery/schema";
+export * from "@/modules/checkout/schema";

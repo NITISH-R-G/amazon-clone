@@ -99,6 +99,12 @@ export default async function PayPage({ params }: PageProps<"/checkout/pay/[id]"
               </li>
             ))}
           </ul>
+          {order.discountCents > 0 ? (
+            <div className="flex justify-between border-t border-input pt-3 text-success">
+              <span>Coupon {order.couponCode}</span>
+              <span>-{formatUsd(order.discountCents)}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between border-t border-input pt-3 text-muted-foreground">
             <span>Shipping</span>
             <span>{order.shippingCents === 0 ? "Free" : formatUsd(order.shippingCents)}</span>

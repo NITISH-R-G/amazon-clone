@@ -5,6 +5,7 @@ import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { deliveryPromise, slowestPromise } from "@/modules/catalog/delivery";
+import { readCoupon } from "@/server/coupon";
 import { getApp } from "@/server/runtime";
 import { readActor, readUser } from "@/server/session";
 
@@ -13,8 +14,9 @@ export const metadata: Metadata = { title: "Checkout" };
 export default async function CheckoutPage() {
   const [actor, user] = await Promise.all([readActor(), readUser()]);
   const app = await getApp();
+  const couponCode = await readCoupon();
   const cart = actor ? await app.cart.getCart(actor) : null;
-  const quote = actor && cart && cart.lines.length > 0 ? await app.checkout.getQuote(actor) : null;
+  const quote = actor && cart && cart.lines.length > 0 ? await app.checkout.getQuote(actor, couponCode) : null;
 
   if (!cart || !quote || !quote.ok) {
     return (
@@ -79,7 +81,8 @@ export default async function CheckoutPage() {
       <CheckoutForm
         mode={app.payments.provider.kind}
         idempotencyKey={crypto.randomUUID()}
-        summary={{ lines: cart.lines, ...quote.value, delivery: delivery?.label ?? null }}
+        couponCode={quote.value.coupon?.code ?? null}
+        summary={{ lines: cart.lines, ...quote.value.quote, couponLabel: quote.value.coupon?.code ?? null, delivery: delivery?.label ?? null }}
         defaults={user ? { name: user.name, contactEmail: user.email } : undefined}
       />
     </div>

@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createSystemIds } from "@/lib/ports";
 import { ensureActor, readActor } from "@/server/session";
+import { clearCoupon, setCoupon } from "@/server/coupon";
+import { couponMessages, normaliseCode, type CouponError } from "@/modules/checkout";
 import { getApp } from "@/server/runtime";
 import type { FormState } from "./form-state";
 
@@ -99,6 +101,7 @@ const placeOrderSchema = z.object({
   expiry: required("Expiry (MM/YY)", 7),
   cvc: required("Security code", 4),
   idempotencyKey: z.string().min(8),
+  couponCode: z.string().max(40).optional(),
 });
 
 const checkoutMessages: Record<string, string> = {
@@ -137,11 +140,13 @@ export async function startCheckoutAction(_prev: FormState, formData: FormData):
   const result = await app.checkout.startCheckout(actor, {
     address: { name: d.name, line1: d.line1, line2: d.line2 || undefined, city: d.city, region: d.region, postalCode: d.postalCode, country: d.country.toUpperCase() },
     contactEmail: d.contactEmail,
+    couponCode: d.couponCode || null,
     idempotencyKey: d.idempotencyKey,
   });
   if (!result.ok) {
     const messages: Record<string, string> = {
       ...checkoutMessages,
+      ...Object.fromEntries((Object.keys(couponMessages) as CouponError[]).map((k) => [k, couponMessages[k]()])),
       CART_CHANGED: "Your cart changed. Review it and start checkout again.",
       ORDER_CLOSED: "This checkout was cancelled. Start again from your cart.",
     };
@@ -176,6 +181,7 @@ export async function placeOrderAction(_prev: FormState, formData: FormData): Pr
     },
     contactEmail: d.contactEmail,
     payment: { number: d.cardNumber, expiry: d.expiry, cvc: d.cvc },
+    couponCode: d.couponCode || null,
     idempotencyKey: d.idempotencyKey,
   });
   if (!result.ok) return { error: checkoutMessages[result.error] ?? "We could not place your order.", values };
@@ -208,3 +214,24 @@ export async function payDemoOrderAction(_prev: FormState, formData: FormData): 
   revalidatePath("/", "layout");
   redirect(`/checkout/confirmation/${parsed.data.orderId}`);
 }
+
+/** Cart page: apply a coupon code. Invalid codes are explained, not silently ignored. */
+export async function applyCouponAction(formData: FormData): Promise<void> {
+  const code = normaliseCode(String(formData.get("code") ?? ""));
+  const actor = await readActor();
+  if (!code || !actor) redirect("/cart");
+  const app = await getApp();
+  const quote = await app.checkout.getQuote(actor, code);
+  if (!quote.ok) redirect("/cart");
+  if (quote.value.couponError) redirect(`/cart?coupon_error=${quote.value.couponError}`);
+  await setCoupon(code);
+  revalidatePath("/", "layout");
+  redirect("/cart");
+}
+
+export async function removeCouponAction(): Promise<void> {
+  await clearCoupon();
+  revalidatePath("/", "layout");
+  redirect("/cart");
+}
+

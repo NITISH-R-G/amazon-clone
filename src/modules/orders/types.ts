@@ -47,6 +47,8 @@ export type Order = {
   shippingCents: Cents;
   taxCents: Cents;
   totalCents: Cents;
+  discountCents: Cents;
+  couponCode: string | null;
   address: ShippingAddress;
   contactEmail: string;
   /** Card summary once paid; null while awaiting payment. */
@@ -77,6 +79,8 @@ export type NewOrder = Pick<
   | "shippingCents"
   | "taxCents"
   | "totalCents"
+  | "discountCents"
+  | "couponCode"
   | "address"
   | "contactEmail"
   | "placedAt"

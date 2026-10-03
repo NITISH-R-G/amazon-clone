@@ -7,13 +7,14 @@ import { shippingFor, taxFor } from "./pricing-rules";
  * First-party lines share the free-shipping rule on their own subtotal; each seller line adds the shipping
  * that seller charges. Tax is on the items.
  */
-export function quoteCart(cart: Pick<Cart, "subtotalCents" | "lines">): Quote {
+export function quoteCart(cart: Pick<Cart, "subtotalCents" | "lines">, discountCents: number = 0): Quote {
   const subtotalCents = cart.subtotalCents;
   const sellerLines = cart.lines.filter((l) => l.offerId !== null);
   const sellerSubtotal = sellerLines.reduce((sum, l) => sum + l.lineTotalCents, 0);
   const firstPartySubtotal = subtotalCents - sellerSubtotal;
   const shippingCents =
     (firstPartySubtotal > 0 ? shippingFor(firstPartySubtotal) : 0) + sellerLines.reduce((sum, l) => sum + l.shippingCents, 0);
-  const taxCents = taxFor(subtotalCents);
-  return { subtotalCents, shippingCents, taxCents, totalCents: subtotalCents + shippingCents + taxCents };
+  // A coupon reduces the items; tax is charged on what is left. Shipping rules look at the undiscounted items.
+  const taxCents = taxFor(subtotalCents - discountCents);
+  return { subtotalCents, discountCents, shippingCents, taxCents, totalCents: subtotalCents - discountCents + shippingCents + taxCents };
 }

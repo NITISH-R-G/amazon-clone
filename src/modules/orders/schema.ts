@@ -12,6 +12,9 @@ export const orders = pgTable(
     shippingCents: integer("shipping_cents").notNull(),
     taxCents: integer("tax_cents").notNull(),
     totalCents: integer("total_cents").notNull(),
+    /** Taken off the items by a coupon; the code is kept for the record. */
+    discountCents: integer("discount_cents").notNull().default(0),
+    couponCode: text("coupon_code"),
     contactEmail: text("contact_email").notNull(),
     address: jsonb("address").$type<ShippingAddress>().notNull(),
     // Filled when the payment is confirmed; null while the order awaits payment.

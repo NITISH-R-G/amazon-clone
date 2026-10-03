@@ -11,6 +11,7 @@ describe("checkout pricing", () => {
     // 2999: under the 3500 threshold -> shipping 499; tax 8% = 239.92 -> 240
     expect(quoteCart(cartWithSubtotal(2999))).toEqual({
       subtotalCents: 2999,
+      discountCents: 0,
       shippingCents: 499,
       taxCents: 240,
       totalCents: 3738,
@@ -18,6 +19,7 @@ describe("checkout pricing", () => {
     // 5998: over the threshold -> free shipping; tax 8% = 479.84 -> 480
     expect(quoteCart(cartWithSubtotal(5998))).toEqual({
       subtotalCents: 5998,
+      discountCents: 0,
       shippingCents: 0,
       taxCents: 480,
       totalCents: 6478,
@@ -33,7 +35,7 @@ describe("checkout quote", () => {
     const quote = await app.checkout.getQuote({ guestToken: "g1" });
     expect(quote).toEqual({
       ok: true,
-      value: { subtotalCents: 5998, shippingCents: 0, taxCents: 480, totalCents: 6478 },
+      value: { quote: { subtotalCents: 5998, discountCents: 0, shippingCents: 0, taxCents: 480, totalCents: 6478 }, coupon: null, couponError: null },
     });
 
     expect(await app.checkout.getQuote({ guestToken: "g2" })).toEqual({ ok: false, error: "EMPTY_CART" });
@@ -176,7 +178,7 @@ describe("checkout with offers", () => {
 
     const quote = await app.checkout.getQuote(g1);
     // Only seller lines: no first-party shipping, the seller's own 399. Tax is 8% of the items.
-    expect(quote).toMatchObject({ ok: true, value: { subtotalCents: 5398, shippingCents: 399, taxCents: 432, totalCents: 6229 } });
+    expect(quote).toMatchObject({ ok: true, value: { quote: { subtotalCents: 5398, shippingCents: 399, taxCents: 432, totalCents: 6229 } } });
 
     const placed = await app.checkout.placeOrder(g1, { address, contactEmail: "a@example.test", payment, idempotencyKey: "k-offer" });
     expect(placed.ok).toBe(true);
@@ -207,6 +209,6 @@ describe("checkout with offers", () => {
     await app.cart.addItem(g1, "var-mug", 1); // first-party 1,200: under the free-shipping threshold -> 499
     await app.cart.addItem(g1, "var-kettle", 1, "offer-kettle-nw"); // 2,699 + 399
     const quote = await app.checkout.getQuote(g1);
-    expect(quote).toMatchObject({ ok: true, value: { subtotalCents: 3899, shippingCents: 499 + 399 } });
+    expect(quote).toMatchObject({ ok: true, value: { quote: { subtotalCents: 3899, shippingCents: 499 + 399 } } });
   });
 });

@@ -45,6 +45,12 @@ export function OrderDetail({ order }: { order: Order }) {
             <dt>Items</dt>
             <dd>{formatUsd(order.subtotalCents)}</dd>
           </div>
+          {order.discountCents > 0 ? (
+            <div className="flex justify-between text-success">
+              <dt>Coupon {order.couponCode}</dt>
+              <dd>-{formatUsd(order.discountCents)}</dd>
+            </div>
+          ) : null}
           <div className="flex justify-between text-muted-foreground">
             <dt>Shipping</dt>
             <dd>{order.shippingCents === 0 ? "Free" : formatUsd(order.shippingCents)}</dd>

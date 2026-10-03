@@ -39,6 +39,8 @@ function toOrder(row: OrderRow, items: ItemRow[], now: Date): Order {
     shippingCents: row.shippingCents,
     taxCents: row.taxCents,
     totalCents: row.totalCents,
+    discountCents: row.discountCents,
+    couponCode: row.couponCode,
     address: row.address,
     contactEmail: row.contactEmail,
     payment:
@@ -77,6 +79,8 @@ export function createOrders({ db, clock }: OrdersDeps) {
         shippingCents: data.shippingCents,
         taxCents: data.taxCents,
         totalCents: data.totalCents,
+        discountCents: data.discountCents,
+        couponCode: data.couponCode,
         contactEmail: data.contactEmail,
         address: data.address,
         idempotencyKey: data.idempotencyKey,

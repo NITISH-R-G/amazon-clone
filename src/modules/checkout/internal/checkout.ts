@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { actorFromKey, actorKey, err, ok, type Actor, type Result } from "@/lib/result";
 import type { DbOrTx } from "@/lib/db";
 import type { Clock, IdGenerator } from "@/lib/ports";
@@ -8,18 +8,22 @@ import type { CancelError, OrdersModule, Order, RefundStatus, ShippingAddress } 
 import type { CardInput, PaymentEvent, PaymentRecord, PaymentsService } from "@/modules/payments";
 import type { CheckoutError, Quote } from "../types";
 import { shippingAddressSchema } from "./address";
+import { applyCoupon, normaliseCode, type AppliedCoupon, type CouponError, type Promotion } from "./coupons";
+import { promotions } from "../schema";
 import { quoteCart } from "./quote";
 
 /** How long the stock is held for an unpaid order. */
 export const HOLD_MINUTES = 15;
 
 export type StartCheckoutInput = {
+  /** A coupon code the customer typed; the amount is always computed here. */
+  couponCode?: string | null;
   address: ShippingAddress;
   contactEmail: string;
   idempotencyKey: string;
 };
 
-export type StartCheckoutError = "EMPTY_CART" | "OUT_OF_STOCK" | "INVALID_ADDRESS" | "CART_CHANGED" | "ORDER_CLOSED";
+export type StartCheckoutError = "EMPTY_CART" | "OUT_OF_STOCK" | "INVALID_ADDRESS" | "CART_CHANGED" | "ORDER_CLOSED" | CouponError;
 
 export type StartedCheckout = {
   order: Order;
@@ -36,6 +40,7 @@ export type PaymentHandled = {
 };
 
 export type PlaceOrderInput = {
+  couponCode?: string | null;
   address: ShippingAddress;
   contactEmail: string;
   payment: CardInput;
@@ -86,10 +91,21 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
   const holdUntil = () => new Date(clock.now().getTime() + HOLD_MINUTES * 60_000);
   const reserveLines = (o: Order) => o.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, offerId: i.offerId }));
 
-  async function getQuote(actor: Actor): Promise<Result<Quote, CheckoutError>> {
+  type Priced = { quote: Quote; coupon: AppliedCoupon | null; couponError: CouponError | null };
+
+  /** Prices a cart, applying the coupon if there is one and it is valid. Always server side. */
+  async function price(current: Parameters<typeof quoteCart>[0], code: string | null | undefined, d: DbOrTx = db): Promise<Priced> {
+    if (!code || !normaliseCode(code)) return { quote: quoteCart(current), coupon: null, couponError: null };
+    const [row] = await d.select().from(promotions).where(eq(promotions.code, normaliseCode(code))).limit(1);
+    const applied = applyCoupon((row as Promotion | undefined) ?? null, current.subtotalCents, clock.now());
+    if (!applied.ok) return { quote: quoteCart(current), coupon: null, couponError: applied.error };
+    return { quote: quoteCart(current, applied.coupon.discountCents), coupon: applied.coupon, couponError: null };
+  }
+
+  async function getQuote(actor: Actor, couponCode?: string | null): Promise<Result<Priced, CheckoutError>> {
     const current = await cart.getCart(actor);
     if (current.lines.length === 0) return err("EMPTY_CART");
-    return ok(quoteCart(current));
+    return ok(await price(current, couponCode));
   }
 
   /**
@@ -121,7 +137,9 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
         }
 
         if (current.lines.length === 0) throw new Abort<StartCheckoutError>("EMPTY_CART");
-        const quote = quoteCart(current);
+        const priced = await price(current, input.couponCode, tx);
+        if (priced.couponError) throw new Abort<StartCheckoutError>(priced.couponError);
+        const quote = priced.quote;
 
         for (const other of await orders.listAwaiting(actor, tx)) {
           await catalog.releaseReservations(other.id, tx);
@@ -148,6 +166,7 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
               offerId: l.offerId,
             })),
             ...quote,
+            couponCode: priced.coupon?.code ?? null,
             address: input.address,
             contactEmail: input.contactEmail,
             placedAt: clock.now(),

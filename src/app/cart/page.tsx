@@ -2,7 +2,7 @@ import { ShoppingBag } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { removeItemAction, restoreItemAction } from "@/app/actions";
+import { applyCouponAction, removeCouponAction, removeItemAction, restoreItemAction } from "@/app/actions";
 import { CartQuantityForm } from "@/components/cart/cart-quantity-form";
 import { DeliveryLine } from "@/components/product/delivery-line";
 import { PriceBlock } from "@/components/product/price-block";
@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Separator } from "@/components/ui/separator";
 import { formatUsd } from "@/lib/money";
-import { quoteCart } from "@/modules/checkout";
+import { couponMessages, quoteCart, type CouponError } from "@/modules/checkout";
+import { readCoupon } from "@/server/coupon";
 import { readActor } from "@/server/session";
 import { getApp } from "@/server/runtime";
 
@@ -35,7 +36,10 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const removedLineId = one("removed");
   const error = one("error");
   const blocked = cart.lines.some((l) => !l.available);
-  const quote = quoteCart(cart);
+  const priced = actor && cart.lines.length > 0 ? await app.checkout.getQuote(actor, await readCoupon()) : null;
+  const quote = priced?.ok ? priced.value.quote : { ...quoteCart(cart) };
+  const coupon = priced?.ok ? priced.value.coupon : null;
+  const couponError = (priced?.ok ? priced.value.couponError : null) ?? (one("coupon_error") as CouponError | undefined) ?? null;
   const savingsCents = cart.lines.reduce((sum, l) => sum + (l.listPriceCents ? (l.listPriceCents - l.unitPriceCents) * l.quantity : 0), 0);
 
   return (
@@ -147,6 +151,12 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                   <dd>{formatUsd(savingsCents)}</dd>
                 </div>
               ) : null}
+              {quote.discountCents > 0 ? (
+                <div className="flex justify-between text-success" data-testid="coupon-discount">
+                  <dt>Coupon {coupon?.code}</dt>
+                  <dd>-{formatUsd(quote.discountCents)}</dd>
+                </div>
+              ) : null}
               <div className="flex justify-between text-muted-foreground">
                 <dt>Estimated shipping</dt>
                 <dd>{quote.shippingCents === 0 ? "Free" : formatUsd(quote.shippingCents)}</dd>
@@ -161,6 +171,33 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               <span>Estimated total</span>
               <span>{formatUsd(quote.totalCents)}</span>
             </p>
+            {coupon ? (
+              <form action={removeCouponAction} className="flex items-center justify-between gap-3 text-sm">
+                <span>
+                  <span className="font-medium">{coupon.code}</span> applied: {coupon.label}
+                </span>
+                <Button type="submit" variant="link" size="sm">
+                  Remove
+                </Button>
+              </form>
+            ) : (
+              <form action={applyCouponAction} className="space-y-1.5">
+                <label htmlFor="coupon-code" className="text-sm font-medium">
+                  Promo code
+                </label>
+                <div className="flex gap-2">
+                  <input id="coupon-code" name="code" autoComplete="off" placeholder="e.g. SAVE10" className="h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm pointer-fine:h-9" />
+                  <Button type="submit" variant="outline" className="h-11 pointer-fine:h-9">
+                    Apply
+                  </Button>
+                </div>
+                {couponError ? (
+                  <p role="alert" className="text-sm font-medium text-destructive">
+                    {couponMessages[couponError](5000)}
+                  </p>
+                ) : null}
+              </form>
+            )}
             {blocked ? (
               <Button size="lg" className="w-full" disabled>
                 Checkout

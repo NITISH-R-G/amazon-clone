@@ -56,6 +56,8 @@ type Summary = {
   taxCents: number;
   totalCents: number;
   delivery?: string | null;
+  discountCents?: number;
+  couponLabel?: string | null;
 };
 
 function SummaryLines({ summary }: { summary: Summary }) {
@@ -81,6 +83,12 @@ function SummaryLines({ summary }: { summary: Summary }) {
           <dt>Items</dt>
           <dd>{formatUsd(summary.subtotalCents)}</dd>
         </div>
+        {summary.discountCents ? (
+          <div className="flex justify-between text-success">
+            <dt>Coupon {summary.couponLabel}</dt>
+            <dd>-{formatUsd(summary.discountCents)}</dd>
+          </div>
+        ) : null}
         <div className="flex justify-between text-muted-foreground">
           <dt>Shipping</dt>
           <dd>{summary.shippingCents === 0 ? "Free" : formatUsd(summary.shippingCents)}</dd>
@@ -105,7 +113,9 @@ export function CheckoutForm({
   summary,
   defaults,
   mode = "demo",
+  couponCode = null,
 }: {
+  couponCode?: string | null;
   mode?: "demo" | "stripe";
   idempotencyKey: string;
   summary: Summary;
@@ -155,6 +165,7 @@ export function CheckoutForm({
     <form action={action} className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-14" noValidate>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <input type="hidden" name="country" value="US" />
+      <input type="hidden" name="couponCode" value={couponCode ?? ""} />
 
       <div className="space-y-10">
         <details className="group rounded-xl bg-muted lg:hidden">
