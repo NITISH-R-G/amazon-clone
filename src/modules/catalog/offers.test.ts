@@ -35,4 +35,15 @@ describe("buy box (pure)", () => {
     // Nothing in stock anywhere: still the first-party offer (the page then says "out of stock").
     expect(bestOffer([offer({ stock: 0 }), seller("a", 900, 0, 0)]).sellerName).toBe("Cartly");
   });
+
+  it("T122: offers within 2% of the lowest landed price are contenders; Cartly fulfilment then wins, however the list is ordered", () => {
+    const cartlyOther = offer({ offerId: "c", sellerName: "Warehouse", priceCents: 10100, shippingCents: 0 }); // Cartly-fulfilled, 1% above
+    const cheapSeller = seller("s", 10000, 0);
+    expect(bestOffer([offer({ stock: 0 }), cheapSeller, cartlyOther]).offerId).toBe("c");
+    expect(bestOffer([offer({ stock: 0 }), cartlyOther, cheapSeller]).offerId).toBe("c");
+    // More than 2% above the lowest: not a contender, the cheaper seller wins.
+    expect(bestOffer([offer({ stock: 0 }), cheapSeller, offer({ offerId: "c2", priceCents: 10300 })]).offerId).toBe("s");
+    // Equal contenders: the shorter handling time, then the id, decide.
+    expect(bestOffer([offer({ stock: 0 }), seller("b", 10000, 0), { ...seller("a", 10000, 0), handlingMinutes: 60 }]).offerId).toBe("a");
+  });
 });

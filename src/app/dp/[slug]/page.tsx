@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Rail } from "@/components/product/rail";
+import { ReviewsSection } from "@/components/product/reviews-section";
 import { ViewTracker } from "@/components/product/view-tracker";
 import { PurchaseGallery } from "@/components/product/purchase-gallery";
 import { ProductSpecs } from "@/components/product/product-specs";
@@ -11,7 +12,7 @@ import { RatingStars } from "@/components/product/rating-stars";
 import { formatUsd } from "@/lib/money";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
 import { getApp } from "@/server/runtime";
-import { readActor } from "@/server/session";
+import { readActor, readUser } from "@/server/session";
 
 export async function generateMetadata({ params }: PageProps<"/dp/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -55,7 +56,12 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       ...(offerMap[v.id] ?? []),
     ],
   }));
-  const actor = await readActor();
+  const [actor, user] = await Promise.all([readActor(), readUser()]);
+  const [reviewSummary, reviewList, eligibility] = await Promise.all([
+    app.reviews.summary(product.id),
+    app.reviews.list(product.id, 6),
+    user ? app.reviews.eligibility(user.id, product.id, product.slug) : null,
+  ]);
   const [related, viewed, forYou] = await Promise.all([
     app.discovery.relatedTo(product.id, 4),
     app.discovery.recentlyViewed(actor, 6, product.id),
@@ -64,7 +70,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const relatedIds = new Set(related.map((p) => p.id));
   const alsoLike = forYou.filter((p) => p.id !== product.id && !relatedIds.has(p.id)).slice(0, 4);
   const deliveryEstimate = new Date().toISOString();
-  const shippingNote = `Free shipping on orders over ${formatUsd(FREE_SHIPPING_THRESHOLD_CENTS)}, otherwise ${formatUsd(FLAT_SHIPPING_CENTS)}. Payment is simulated in this demo.`;
+  const shippingNote = `Free shipping on orders over ${formatUsd(FREE_SHIPPING_THRESHOLD_CENTS)}, otherwise ${formatUsd(FLAT_SHIPPING_CENTS)}.${app.payments.provider.kind === "demo" ? " Payment is simulated in this demo." : " Payments run in Stripe test mode."}`;
 
   return (
     <PurchaseProvider variants={variants} defs={defs} productImages={product.images} initialSku={typeof sp.sku === "string" ? sp.sku : undefined}>
@@ -86,7 +92,11 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             {product.brand}
           </p>
           <h1 className="text-[28px] leading-9 font-semibold tracking-[-0.02em] sm:text-[32px] sm:leading-[38px]">{product.title}</h1>
-          {product.ratingCount > 0 ? <RatingStars rating={product.rating} count={product.ratingCount} /> : null}
+          {product.ratingCount > 0 ? (
+            <a href="#reviews" className="inline-block hover:underline">
+              <RatingStars rating={product.rating} count={product.ratingCount} />
+            </a>
+          ) : null}
         </div>
         <LivePrice className="xl:hidden" />
       </div>
@@ -115,6 +125,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         <ProductSpecs specs={product.specs} />
       </div>
     </article>
+    <ReviewsSection slug={product.slug} summary={reviewSummary} reviews={reviewList} canReview={Boolean(eligibility?.ok)} />
     <div className="mt-20 space-y-16 border-t pt-10">
       <Rail id="related" title="Related products" subtitle="Similar products, ranked by type, brand, price and rating" href={category ? `/s?c=${category.slug}&sort=rating` : undefined} products={related} />
       <Rail id="based-on-views" title="Based on your recent views" products={alsoLike} />

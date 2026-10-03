@@ -258,6 +258,11 @@ export function createCatalog({ db, clock }: CatalogDeps) {
       }
     },
 
+    /** The rating shown for a product, recomputed by `reviews` from its review rows (tenths: 45 is 4.5). */
+    async setRating(productId: string, ratingTenths: number, ratingCount: number, tx?: DbOrTx): Promise<void> {
+      await (tx ?? db).update(products).set({ ratingTenths, ratingCount }).where(eq(products.id, productId));
+    },
+
     /** Gives held (not yet committed) stock back: payment failed, expired or the order was cancelled. */
     async releaseReservations(orderId: string, tx?: DbOrTx): Promise<void> {
       await (tx ?? db)

@@ -2,6 +2,7 @@
 // Idempotent. Run by the Vercel build (`vercel-build`) and by hand: `pnpm db:setup`.
 // Uses DATABASE_URL when set; without it there is nothing to prepare (PGlite prepares itself).
 import { seedDemoCatalog } from "@/db/seed-demo";
+import { seedDemoExtras } from "@/db/seed-reviews";
 import { openDatabase } from "@/server/database";
 
 async function main() {
@@ -15,6 +16,7 @@ async function main() {
   try {
     await handle.migrate();
     await seedDemoCatalog(handle.db);
+    await seedDemoExtras(handle.db);
     console.log(`db:setup done in ${Date.now() - started} ms`);
   } finally {
     await handle.close();

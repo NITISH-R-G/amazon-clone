@@ -7,3 +7,4 @@ export * from "@/modules/auth/schema";
 export * from "@/modules/payments/schema";
 export * from "@/modules/discovery/schema";
 export * from "@/modules/checkout/schema";
+export * from "@/modules/reviews/schema";

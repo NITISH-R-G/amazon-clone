@@ -1,4 +1,5 @@
 import { seedDemoCatalog } from "@/db/seed-demo";
+import { seedDemoExtras } from "@/db/seed-reviews";
 import { createSystemIds, systemClock } from "@/lib/ports";
 import { createDemoProvider, createStripeProvider } from "@/modules/payments";
 import { createApp, type App } from "./app";
@@ -14,6 +15,7 @@ async function init(): Promise<App> {
   if (handle.driver === "pglite") {
     await handle.migrate();
     await seedDemoCatalog(handle.db);
+    await seedDemoExtras(handle.db);
   }
   const ids = createSystemIds();
   return createApp({

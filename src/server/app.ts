@@ -8,6 +8,7 @@ import { createCheckout } from "@/modules/checkout";
 import { createDiscovery } from "@/modules/discovery";
 import { createOrders } from "@/modules/orders";
 import { createPayments } from "@/modules/payments";
+import { createReviews } from "@/modules/reviews";
 import { createSearch } from "@/modules/search";
 import type { PaymentProvider } from "@/modules/payments";
 
@@ -35,7 +36,8 @@ export function createApp({ db, clock, ids, payments }: AppDeps) {
   const search = createSearch({ catalog });
   const auth = createAuth({ db, clock, ids });
   const discovery = createDiscovery({ db, clock, catalog, search });
-  return { db, catalog, cart, orders, discovery, payments: paymentService, checkout, search, auth };
+  const reviews = createReviews({ db, clock, catalog, orders });
+  return { db, catalog, cart, orders, discovery, reviews, payments: paymentService, checkout, search, auth };
 }
 
 export type App = ReturnType<typeof createApp>;
