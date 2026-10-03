@@ -1,0 +1,53 @@
+\chapter{Pricing, Coupons and Delivery Promise}
+\label{ch:commerce}
+
+\section{The pricing flow}
+
+Every amount the customer pays is computed on the server from the server-side cart. The browser never supplies a price, a discount or a total.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=6mm]
+\node[mod] (a) {Offer price\\\scriptsize variant or seller};
+\node[mod, right=of a] (b) {Items\\subtotal};
+\node[mod, right=of b] (c) {Coupon\\\scriptsize discount};
+\node[mod, right=of c] (d) {Shipping};
+\node[mod, right=of d] (e) {Tax};
+\node[mod, right=of e] (f) {Total};
+\foreach \s/\t in {a/b,b/c,c/d,d/e,e/f} \draw[arr] (\s) -- (\t);
+\end{tikzpicture}
+\caption{Order of computation (\code{checkout/internal/quote.ts}). Deals are already in the offer price as a list-price reduction.}
+\label{fig:pricing}
+\end{figure}
+
+The rules are provisional demo rules, isolated in one file: first-party items ship free from a \$35.00 subtotal, otherwise \$4.99; each seller line adds the shipping that seller charges; tax is 8\% of the items \emph{after} any coupon. All arithmetic is in integer cents, with tax rounded half up. \tagimpl{} \tagtest{}
+
+\section{Deals and coupons}
+
+A \emph{deal} is simply an offer whose list price exceeds its price; the interface shows the original price, the price and the percentage saved. A \emph{coupon} is a row in the \code{promotions} table: a code, a kind (percent or fixed amount), a value, a minimum items subtotal and a validity window. Three demonstration codes are seeded: \code{SAVE10} (10\% off, minimum \$50.00), \code{WELCOME5} (\$5 off, minimum \$25.00) and \code{SPRING20}, which is expired on purpose so the failure path is visible.
+
+Validation is a pure function: the code is matched case-insensitively; it must have started and not ended; the items subtotal must reach the minimum; a percentage rounds down and a discount can never exceed the subtotal. The cart stores only the \emph{code} (in a cookie); the discount is recomputed on every quote and again when checkout starts, and the order stores the code and the discount amount. A client can therefore not invent or alter a discount. The messages distinguish an unknown code, a code not yet active, an expired code and a minimum not reached, and the latter shows that code's own minimum. \tagimpl{} \tagtest{}
+
+One limitation found during customer-perspective testing: the expired-code message does not state the expiry date.
+
+\section{The delivery promise}
+
+``When will it arrive'' is answered by a deterministic function (\code{catalog/delivery.ts}) that takes the current time, the fulfilment mode, the seller's handling time and, when known, the destination ZIP code.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=7mm]
+\node[mod] (a) {Order time\\\scriptsize vs 15:00 UTC cut-off};
+\node[mod, right=of a] (b) {Fulfilment\\\scriptsize + seller handling};
+\node[mod, right=of b] (c) {Ship date\\\scriptsize business days};
+\node[mod, right=of c] (d) {Transit\\\scriptsize by ZIP region};
+\node[mod, right=of d] (e) {Delivery\\window};
+\foreach \s/\t in {a/b,b/c,c/d,d/e} \draw[arr] (\s) -- (\t);
+\end{tikzpicture}
+\caption{Inputs to the delivery promise.}
+\label{fig:delivery}
+\end{figure}
+
+The rule: orders placed before the cut-off on a weekday start processing that day, others on the next business day. Cartly-fulfilled offers ship on the processing day; seller-fulfilled offers add one business day plus one more for every 12 hours of the seller's stated handling time. Transit takes two, three or four business days depending on the first digit of the ZIP code (unknown: three), and the result is shown as a one-day window, for example ``Wed, Oct~7 -- Thu, Oct~8''. Weekends are never delivery days. For a whole cart the slowest line decides. The same function produces the text on the product page, the other-sellers list, the cart, the checkout summary and the order. \tagimpl{} \tagtest{} (four tests cover the cut-off, weekends, seller handling and destination.)
+
+This is a simulation of a promise, not a logistics system: there are no carriers, warehouses or tracking. The separate order status timeline (placed, shipped, out for delivery, delivered) runs on a compressed demo clock, and the report does not claim the two represent the same real-world process.

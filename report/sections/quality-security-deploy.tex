@@ -1,0 +1,64 @@
+\chapter{Testing, Security and Deployment}
+\label{ch:quality}
+
+\section{Testing and quality engineering}
+
+\begin{table}[H]
+\centering
+\caption{Test layers and results at the time of writing.}
+\label{tab:tests}
+\small
+\begin{tabularx}{\linewidth}{@{}p{2.6cm}XXp{2.4cm}@{}}
+\toprule
+Layer & Purpose & Coverage & Result \\
+\midrule
+Pure unit tests & Rules with no I/O & Buy box, delivery promise, coupons, recommendation scoring, payment state function, variant resolution, concept lexicon, fusion score & Pass \\
+Integration tests (real PostgreSQL engine) & Module behaviour through public interfaces & Reservations and last-unit race, two-phase checkout, payment flow, webhook signatures, refunds, reviews eligibility, recently viewed, sponsored placement, hybrid search, seeding & 131 tests in 26 files pass \\
+End-to-end (Playwright) & Real browser against a production build, fresh in-memory database & 12 scenarios on a desktop and a phone (Pixel 7) viewport: discovery with typo recovery, purchase, variants, offers, structured search, lifecycle and cancellation, declined-card recovery, guest-to-account, overflow check, two-shopper race & Last full run: 18 run and passed, 6 skipped by design; later subset runs passed \\
+Stripe browser test & Real Payment Element, test card and decline & Two scenarios & Skipped without keys; \tagunver{} \\
+Static checks & Types and boundaries & TypeScript strict; ESLint including the module-boundary rule & Clean \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Tests carry stable identifiers (T1 to T132) that the decision log refers to. Representative examples: T104 starts two checkouts for the last unit concurrently and asserts that exactly one succeeds; T100 delivers a payment success after the hold expired, once when the unit is free (order placed) and once when another customer bought it (order cancelled and refunded, never double-sold); T97 and T98 show a declined payment keeping the order and hold, and a retry succeeding; T105--T109 replay, tamper with and reorder signed webhook events; T119--T121 and T132 cover coupon arithmetic, trust boundary and messages; T122 checks the buy-box tolerance and order independence; T114--T118 check that recommendations are deterministic and exclude the seed and out-of-stock items; T123 checks the verified-review rule end to end; T125 shows sponsored placement leaves organic results unchanged; T127--T131 cover the concept lexicon, fusion and fallback.
+
+A CI workflow (lint, type check, unit and integration tests; no secrets needed) is in the repository but its first run on GitHub was not observed; the browser tests are run locally because they use the installed Chrome. One tooling lesson from development: running a development server and a production build in the same working directory corrupted an end-to-end run; it was diagnosed and avoided.
+
+\section{Security and trust boundaries}
+
+Only measures that exist in the code are listed. This is a demonstration project and no penetration test was performed.
+
+\begin{itemize}
+\item \textbf{Server-side money.} Prices, discounts, shipping, tax, totals and the payment amount are computed on the server from server-held state. The client sends a coupon \emph{code} and quantities, nothing monetary.
+\item \textbf{Payment authority.} The order is placed only from a signature-verified Stripe webhook over the raw request body, or from a server-side retrieval of the PaymentIntent. The browser redirect and the client library's result are not trusted.
+\item \textbf{Secrets.} Database URL and Stripe keys exist only as environment variables; only the Stripe publishable key reaches the browser. A scan of tracked files found no keys or connection strings (only fake values in a unit test). Raw reference captures that could contain a real person's session data are excluded from the repository by ignore rules.
+\item \textbf{Authentication.} Passwords are hashed with scrypt and a per-user salt and compared in constant time; a dummy hash equalises timing for unknown emails. Session tokens are random, stored only as hashes, and sent in HTTP-only, SameSite cookies marked secure in production; sessions expire after 30 days.
+\item \textbf{Access control.} Orders and carts are scoped to their owner key; fetching another customer's order identifier returns nothing. Reviews require a delivered order.
+\item \textbf{Input handling.} Inputs are parsed with Zod at the boundary; queries use parameterised SQL through the ORM; free-text search input is normalised and bounded.
+\item \textbf{Idempotency and replay.} Duplicate form submissions, duplicate webhooks and repeated refunds are safe by construction (Chapter~\ref{ch:inventory}).
+\end{itemize}
+
+Not implemented: rate limiting, CSRF tokens beyond the framework's server-action protections, bot protection, fraud screening and audit logging.
+
+\section{Deployment}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=7mm]
+\node[mod] (dev) {Local\\\scriptsize PGlite, demo payments};
+\node[mod, right=of dev] (test) {Tests\\\scriptsize unit, E2E};
+\node[mod, right=of test] (gh) {GitHub\\\scriptsize main};
+\node[mod, right=of gh] (vc) {Vercel\\\scriptsize build, HTTPS};
+\node[store, below=10mm of vc] (pg) {Managed\\PostgreSQL};
+\node[ext, left=of pg] (st) {Stripe\\\scriptsize test mode};
+\foreach \s/\t in {dev/test,test/gh,gh/vc} \draw[arr] (\s) -- (\t);
+\draw[arr] (vc) -- (pg);
+\draw[arr] (vc) -- (st);
+\draw[darr] (st.north) -- ++(0,5mm) -| node[lbl, pos=0.2]{webhook} ([xshift=-6mm]vc.south);
+\end{tikzpicture}
+\caption{Path from development to production.}
+\label{fig:deploy}
+\end{figure}
+
+The same SQL runs everywhere: PGlite locally and in tests, a pooled PostgreSQL connection in production, selected by whether \code{DATABASE\_URL} is set. Migrations and seeding are not run on requests; the Vercel build command applies migrations and seeds an empty database (idempotently) before building. The deployment documents choose Neon as the managed PostgreSQL host; the repository cannot confirm which host the live deployment uses. GitHub records production deployments of the final commits as successful and the site serves over HTTPS. The Stripe webhook endpoint is \code{/api/webhooks/stripe}; an unsigned request is rejected with HTTP 400, which was checked against the live site. Webhook delivery from Stripe to the live endpoint and the full payment were not verified. \tagunver{}

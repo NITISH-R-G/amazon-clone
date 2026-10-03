@@ -1,0 +1,36 @@
+\chapter{Customer Experience and Performance}
+\label{ch:ux}
+
+\section{Customer-facing decisions}
+
+The interface follows a restrained monochrome direction (white, black and neutral greys, one typeface, black primary actions, no gradients or decorative shadows), recorded as a design decision after an earlier warmer direction was rejected. Beyond appearance, the useful question was what a customer who has never seen the system will expect, misunderstand and be frustrated by. Decisions that followed:
+
+\begin{itemize}
+\item \textbf{Identity of what is being bought.} Variant labels, SKU and seller appear on the product page, in the cart and on the order, so the customer can see which configuration and from whom.
+\item \textbf{The cart survives.} The cart is stored on the server against the signed-in user or a guest cookie, so reloads and navigation do not lose it; a guest cart merges into the account on sign-in. Removing an item offers an undo. Quantity controls are clamped to available stock with an explanation, rather than failing at checkout.
+\item \textbf{Guest checkout is open.} Accounts add history; they do not gate purchase.
+\item \textbf{Coupon feedback.} Invalid, expired and under-minimum codes each get a specific message.
+\item \textbf{Delivery and seller visibility.} The delivery window and seller are shown at the purchase decision, in the cart and at checkout, not only after ordering.
+\item \textbf{Empty and failure states.} An empty cart, a search with no results (with department links), an expired checkout hold, a declined payment and a sold-out item each say what happened and what to do next. A declined payment keeps the cart and the typed address.
+\item \textbf{Mobile.} The product page gets a sticky purchase bar when the primary action scrolls away; filters open in a deliberate sheet; automated checks verify that key pages do not overflow horizontally on a phone viewport.
+\item \textbf{Accessibility.} Semantic structure, labelled form fields, announced status and error messages, visible focus and touch-sized targets were part of the design rules; a browser audit at widths from 320 to 1440 pixels was recorded in the project documents.
+\item \textbf{No manufactured urgency.} Stock messages reflect real stock.
+\end{itemize}
+
+Customer-perspective testing of the deployed site found three small defects, two of which were fixed before this report: a footer that still said payments were simulated while Stripe was active, and a coupon message that showed the wrong minimum spend. The third (weak results for some vague meaning queries) is described in Chapter~\ref{ch:search}. Several customer paths were \emph{not} tested manually in this review: back and forward navigation through checkout, quantity extremes, a sell-out during checkout, and the full mobile purchase flow. Some are covered by automated tests; the rest are listed in the limitations.
+
+\section{Performance and scale}
+
+The architecture avoids the usual early mistakes rather than claiming scale it has not proven.
+
+\begin{itemize}
+\item Search and filtering run in indexed SQL; pages never load the catalogue. Result pages are bounded and paginated.
+\item Indexes exist for full-text and trigram search, brand, category, type, attributes (GIN), variants by product, reservations by unit, orders by owner, offers by variant, order items by order and product rating ordering.
+\item Facets and result pages issue a fixed number of queries independent of result size.
+\item Product pictures use lazy loading except for the first row, and the purchase and checkout screens are server-rendered.
+\item Writes that must be consistent (checkout start, payment confirmation, cancellation) are single transactions.
+\end{itemize}
+
+\paragraph{Measurements recorded in the repository.} Early in the work the search approach was measured on PGlite before committing to PostgreSQL search. A throwaway benchmark on synthetic rows found that loading and joining the whole catalogue per query cost 63~ms at 3,000 products and 269~ms at 12,000 (and three such queries on the home page), while an indexed full-text query stayed at 1.4~ms and 3.9~ms and a trigram typo query at 2.6~ms and 8.5~ms at those sizes. After the 2,400-product build, warm requests on a production build with in-memory PGlite on a loaded laptop measured about 85--120~ms for the home page, 80--135~ms for a results page, 50--70~ms for a deep category page, about 0.2~s for a typo query and 30--50~ms for a product page. These were measured on PGlite (PostgreSQL compiled to WebAssembly), not on the deployed database, and the project documents state that they must be re-measured there. No load test was run.
+
+\paragraph{Current implementation versus production scale.} At Amazon's actual scale the catalogue, search, inventory, pricing and recommendation systems are separate services with their own data stores and teams. This project is one program and one primary database. It demonstrates correct behaviour at a few thousand products, not capacity at hundreds of millions; Chapter~\ref{ch:decisions} describes what would change.

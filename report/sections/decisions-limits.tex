@@ -1,0 +1,67 @@
+\chapter{Engineering Decisions, Limits and Future Architecture}
+\label{ch:decisions}
+
+\section{Decisions and tradeoffs}
+
+\begin{table}[H]
+\centering
+\caption{Principal decisions (numbers refer to the repository's decision log).}
+\label{tab:decisions}
+\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{2.7cm}XXX@{}}
+\toprule
+Decision & Alternatives considered & Why chosen & Tradeoff \\
+\midrule
+PostgreSQL for search (D23) & Dedicated search engine; keeping the earlier in-memory search & Benchmarks showed in-memory scanning degrading by 3,000 products while indexed SQL stayed in milliseconds; one system to operate & Weaker relevance tuning; no learned ranking \\
+Concept-based hybrid retrieval (D32) & Embeddings with pgvector or a hosted model & No installed model, no new paid service or secret, deterministic and testable, graceful fallback & Understands only the lexicon; some vague queries return weak results \\
+Deterministic recommendations (D30) & Trained model & No training data in the time box; explainable and reproducible & Cannot learn from behaviour \\
+Modular monolith (modules document) & Microservices & One deployable unit; boundaries enforced by lint; fits one developer & Boundaries are social plus tooling, not network \\
+Provider interface for payments (D28) & Calling Stripe directly & Demo provider for tests; webhook and retrieval share one event handler & An extra abstraction to maintain \\
+Reservation-based stock (D27) & Decrement at payment; optimistic retry & Prevents selling twice and charging for unavailable stock & Holds stock for 15 minutes from abandoned checkouts \\
+Synthetic catalogue (D23) & Scraped or licensed product data & No data rights; deterministic and reproducible & Product data is obviously artificial \\
+Implicit first-party offer (D26) & Every variant as explicit offers & No migration of existing cart and checkout; seller offers are additive & Two code paths for the first-party and seller cases \\
+Derived order timeline (D24) & Stored statuses with a job runner & No scheduler needed; consistent with the clock & Time compressed for demonstration \\
+Guest checkout open (D22) & Required accounts & Fewer abandoned purchases & Accounts add history, not security of the purchase \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{What was deliberately not built}
+
+\begin{itemize}
+\item \textbf{Distributed search and learned ranking.} The catalogue is small and the ranking is rules; a dedicated engine would add infrastructure without a visible gain in the time box.
+\item \textbf{Machine-learned recommendation and an ad auction.} No behavioural data or traffic exists to learn from; the observable behaviour (separation, labelling, determinism) was the point.
+\item \textbf{Warehouse management and a real logistics network.} Inventory is a count per variant or offer; delivery is a deterministic simulation.
+\item \textbf{Seller operations.} No seller portal, onboarding, payouts or seller ratings.
+\item \textbf{Live payments, saved cards and fraud detection.} Stripe test mode only; card data never touches the server.
+\item \textbf{Large-scale personalisation infrastructure.} Personalisation is a per-visitor view history.
+\item \textbf{Reviews beyond the basics.} No helpful votes, images or moderation.
+\item \textbf{Email, returns, internationalisation, tax by jurisdiction.} A single country and provisional tax and shipping rules.
+\end{itemize}
+
+Each was deferred because it either needed infrastructure or data that the time box could not supply or would not change what a reviewer could verify about the system's correctness.
+
+\section{Limitations}
+
+\paragraph{Product.} The catalogue, sellers, reviews and campaigns are synthetic and the pictures are generated illustrations. Some vague meaning queries return weak results. The expired-coupon message has no date. Taxes and shipping are demo rules.
+
+\paragraph{Infrastructure.} One application and one primary database; no cache layer, queue, search service, observability stack or rate limiting. Reservation expiry is lazy, which is correct for availability but means abandoned holds are not actively cleaned.
+
+\paragraph{Scale.} Measured behaviour is for a few thousand products on PGlite and a managed database of modest size; no load test was run and the recorded timings were not repeated on the deployed database.
+
+\paragraph{Validation.} A completed live Stripe test payment and webhook delivery were not confirmed from the repository; the Stripe browser tests were skipped for lack of keys; the first CI run on GitHub was not observed; several customer paths (back-navigation through checkout, mid-checkout sell-out, full mobile purchase) were not manually verified in a final pass.
+
+\section{Future architecture}\label{sec:future}
+
+\callout{Label}{This section describes possible evolution. None of it exists in the repository.}
+
+If the prototype became a product, the natural seams are already the module boundaries:
+
+\begin{itemize}
+\item \textbf{Catalogue and search services.} Move catalogue ingestion and indexing behind a service with a search engine for relevance and facets; keep PostgreSQL as the source of truth. A learned retriever (embeddings) could replace the concept lexicon, with the lexical path retained as the fallback exactly as today.
+\item \textbf{Inventory service.} Extract reservations into a service with per-location stock and expiry workers, preserving the held, committed, released lifecycle.
+\item \textbf{Payments and order management.} Keep the provider interface; add live-mode controls, asynchronous reconciliation against the provider and a returns and refund workflow.
+\item \textbf{Fulfilment and delivery.} Replace the deterministic promise with carrier and warehouse data, keeping the same function signature as the contract.
+\item \textbf{Recommendation and ads platforms.} Train ranking from behavioural events, run experiments, and add an auction with budgets and reporting, retaining the rule that sponsored content is separate and labelled.
+\item \textbf{Seller platform, analytics and experimentation.} Seller onboarding and ratings; event pipelines and A/B testing.
+\end{itemize}

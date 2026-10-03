@@ -1,0 +1,53 @@
+\chapter{Recommendations, Sponsored Placements and Reviews}
+\label{ch:discovery}
+
+\section{Recently viewed and personalisation}
+
+Every product page view is recorded against the visitor (signed-in user, or an anonymous browser identifier) in \code{product\_views}, one row per visitor and product, newest first. The anonymous identifier lives in its own cookie, separate from the cart's guest token: an early version recorded views with the cart token and could race with cart creation, so the two were separated. On sign-in the anonymous history is merged into the account. The home page uses it to show ``Pick up where you left off'' and ``Recommended for you''; with no history, those rails are simply absent and the generic rails remain. \tagimpl{} \tagtest{}
+
+\section{Deterministic recommendations}
+
+Recommendations are a transparent weighted sum computed from a bounded candidate pool (the best-rated products of each seed's type and category). For a seed product and a candidate:
+
+\begin{table}[H]
+\centering
+\caption{Recommendation signals (\code{discovery/score.ts}).}
+\label{tab:reco}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Signal & Contribution \\
+\midrule
+Same product type & $+4$ \\
+Same category (different type) & $+2$ \\
+Same brand & $+2$ \\
+Shared attribute values & $+0.5$ each, at most 3 \\
+Price proximity (log scale) & $0$ to $+2$ \\
+Rating & $0$ to $+1.5$ \\
+Popularity (rating count, capped at 1,000) & $0$ to $+1$ \\
+On sale & $+0.75$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With several seeds (the last three viewed products) each seed's similarity is divided by its recency rank, so the most recent view counts most. Seeds and out-of-stock products are never recommended, and ties break on product identifier. The same function powers ``Related products'' on a product page (one seed) and ``Recommended for you'' (up to three seeds). \tagimpl{} \tagtest{}
+
+We chose a transparent rule over a trained model because the time box allowed no data to train on, because a rule can be explained to a customer and a reviewer, because it is reproducible (the same inputs always give the same page, which makes it testable), and because it needs no infrastructure. It is not machine learning and the report does not call it that.
+
+\section{Sponsored placements}
+
+A sponsored campaign is a row in \code{sponsored\_campaigns}: a product, a placement (search or home), keywords, a bid, a budget and a date window. The service returns active campaigns with budget remaining, ordered by bid (ties by identifier). For search placements the campaign's keywords must match the query; products already in the organic results are excluded so a product never appears twice.
+
+The crucial property is separation: sponsored products are returned by a separate call and rendered in their own block labelled ``Sponsored''; they never enter, reorder or alter the organic ranking, which a test asserts by comparing organic results before and after. A sponsored product that is out of stock is not shown. This is an observable simulation of marketplace advertising, not an ad auction: there is no pricing mechanism, spend accounting or relevance model. \tagimpl{} \tagtest{}
+
+\section{Reviews and trust}
+
+A review stores a product, an optional variant, an author, a rating from one to five, a title, a body, a ``verified'' flag and a timestamp. Three properties matter.
+
+\begin{itemize}
+\item \textbf{Verified means something.} The flag is set only by the server, and only when the signed-in user has a \emph{delivered} order containing a variant of that product; a client cannot claim it. A user may review a product once, and an order that is merely placed does not qualify. \tagtest{}
+\item \textbf{Aggregates are real.} The displayed rating and count of a product are recomputed from its review rows (at seeding, and after each new review), and the page shows the average, the count, a five-bar distribution and the review text with a verified badge.
+\item \textbf{Seeded data is labelled honestly.} The catalogue is seeded with two to eight invented reviews per product written from templates and a seeded random generator, with some flagged verified. These flags are synthetic data, not outcomes of the eligibility rule. The demonstration account (credentials documented in the repository for demo use) has three delivered orders so that the real rule can be shown live.
+\end{itemize}
+
+Verified reviews are more meaningful than arbitrary star averages because they connect an opinion to a completed transaction. In this project that connection is real for new reviews and simulated for seeded ones, and the report keeps that distinction.

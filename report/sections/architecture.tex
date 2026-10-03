@@ -1,0 +1,136 @@
+\chapter{System Architecture}
+\label{ch:architecture}
+
+\section{A modular monolith}
+
+The application is one deployable Next.js program organised into modules. Each module exposes a small public interface (\code{index.ts}) and keeps its implementation in an \code{internal/} directory; a lint rule forbids importing another module's internals. This gives most of the design discipline of services without the operational cost, which suited a one-person, one-day build. \tagimpl{}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\node[ext] (browser) at (0,0) {Browser};
+\node[box, minimum width=7.2cm] (next) at (0,-1.7) {Next.js application\\\scriptsize server components, server actions, route handlers};
+\node[mod, minimum width=7.2cm, minimum height=2.2cm] (mods) at (0,-4.2) {};
+\node[font=\scriptsize\bfseries, anchor=north] at ([yshift=-1mm]mods.north) {Application modules};
+\node[font=\small, align=center] at ([yshift=-2.5mm]mods.center) {catalog \quad search \quad discovery\\cart \quad checkout \quad orders\\payments \quad reviews \quad auth};
+\node[store, minimum width=7.2cm] (db) at (0,-6.6) {PostgreSQL (PGlite in development and tests)};
+\node[ext] (stripe) at (7.4,-4.2) {Stripe\\\scriptsize test mode};
+\draw[arr] (browser) -- (next);
+\draw[arr] (next) -- (mods);
+\draw[arr] (mods) -- (db);
+\draw[arr] (mods.east) -- node[above, font=\scriptsize, align=center]{PaymentIntent,\\refund} (stripe.west);
+\draw[darr] (stripe.north) |- node[pos=0.8, above, font=\scriptsize]{signed webhook} (next.east);
+\end{tikzpicture}
+\caption{Runtime view. Dashed boxes are external to the application.}
+\label{fig:arch}
+\end{figure}
+
+\section{Module dependencies}
+
+Figure~\ref{fig:deps} shows who may call whom. Checkout is the only orchestrator: it asks the cart for lines, the catalogue to reserve stock, payments to talk to the provider and orders to persist the result. The composition root (\code{src/server/app.ts}) is the only file that wires modules together.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\node[mod] (catalog) at (3.6,0) {catalog};
+\node[mod] (cart) at (0.4,-1.7) {cart};
+\node[mod] (search) at (6.8,-1.7) {search};
+\node[mod] (checkout) at (0.4,-3.4) {checkout};
+\node[mod] (discovery) at (6.8,-3.4) {discovery};
+\node[mod] (payments) at (0.4,-5.1) {payments};
+\node[mod] (orders) at (3.6,-5.1) {orders};
+\node[mod] (reviews) at (6.8,-5.1) {reviews};
+\draw[arr] (cart) -- (catalog);
+\draw[arr] (search) -- (catalog);
+\draw[arr] (discovery) -- (search);
+\draw[arr] (checkout) -- (cart);
+\draw[arr] (checkout) -- (payments);
+\draw[arr] (checkout) -- (orders);
+\draw[arr] (reviews) -- (orders);
+\end{tikzpicture}
+\caption{Main module dependencies (arrow: ``uses''). Not drawn, to keep it readable: checkout, discovery and reviews also read the catalogue, and the route layer uses auth for sessions.}
+\label{fig:deps}
+\end{figure}
+
+\section{Boundaries that make it testable}
+
+Only three things are replaced by test doubles: the \emph{clock}, the \emph{identifier generator} and the \emph{payment provider}. The database is always real: tests run a genuine PostgreSQL engine in-process (PGlite), with the same migrations as production. This is deliberate. The interesting failures in this system (a lock that does not serialise, a constraint that does not hold) disappear if the database is mocked. \tagimpl{} \tagtest{}
+
+\section{Technology stack}
+
+\begin{table}[H]
+\centering
+\caption{Technologies actually used.}
+\label{tab:stack}
+\small
+\begin{tabularx}{\linewidth}{@{}p{3.2cm}p{4.8cm}X@{}}
+\toprule
+Technology & Role & Reason \\
+\midrule
+Next.js 16 (App Router) & Routes, server rendering, server actions, route handlers & One deployable unit; server components keep pricing and ranking on the server \\
+React 19, TypeScript (strict) & UI and types across the whole codebase & Types carry the domain model (money is integer cents) \\
+Tailwind CSS 4, shadcn/ui, Radix & Components and styling & Accessible primitives; restrained monochrome design \\
+PostgreSQL & System of record \emph{and} search engine & Transactions, row locks, full-text, trigram; one database to operate \\
+Drizzle ORM & Schema and typed queries, SQL migrations & Schema in TypeScript; plain SQL where needed \\
+PGlite & PostgreSQL in-process for development and tests & Fast, real engine; same SQL as production \\
+\code{pg} & Production driver & Pooled connections to managed PostgreSQL \\
+Stripe (SDK, Payment Element) & Test-mode payments & Real PaymentIntent lifecycle and signed webhooks \\
+Zod & Input validation at boundaries & Shared parse-then-trust pattern \\
+Vitest, Playwright & Unit/integration and end-to-end tests & Real database in tests; desktop and phone viewports \\
+Vercel & Hosting over HTTPS & Git-connected deployment; migrations run at build time \\
+pnpm, ESLint & Tooling & Reproducible installs; module-boundary lint rule \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Domain model}
+
+The most important idea in the model is the three-level distinction between product, variant and offer (Figure~\ref{fig:pvo}). A \emph{product} is what a customer thinks of as ``the laptop''. A \emph{variant} is one exact configuration of it with its own SKU. An \emph{offer} is a particular seller's way of selling that exact variant. As an illustration (not a claim about a seeded item): the product ``Laptop X'' has the variant ``16~GB / 512~GB / Silver'', and ``Seller A'' may offer that variant at a given price and shipping cost while another seller offers the same variant for less but ships later.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=10mm]
+\node[mod, minimum width=2.6cm] (p) {Product\\\scriptsize Laptop X};
+\node[mod, right=of p, minimum width=3.2cm] (v) {Variant\\\scriptsize 16 GB / 512 GB / Silver\\\scriptsize SKU, price, stock};
+\node[mod, right=of v, minimum width=3.2cm] (o) {Offer\\\scriptsize Seller A: price, shipping,\\\scriptsize handling, stock};
+\draw[arr] (p) -- node[lbl]{1..n} (v);
+\draw[arr] (v) -- node[lbl]{0..n} (o);
+\end{tikzpicture}
+\caption{Product, variant and offer. The variant row itself acts as the implicit first-party offer; seller offers are additional rows.}
+\label{fig:pvo}
+\end{figure}
+
+Figure~\ref{fig:er} shows the main tables (21 in total; satellite tables such as sessions and campaigns omitted for readability).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=8mm and 12mm, every node/.style={font=\scriptsize}]
+\node[store] (cat) {categories};
+\node[store, right=of cat] (type) {product\_types};
+\node[store, right=of type] (attr) {attribute\_defs};
+\node[store, below=of type] (prod) {products\\\tiny typed attributes (JSON)};
+\node[store, below=of prod] (var) {variants\\\tiny SKU, selections, price, stock};
+\node[store, right=of var] (off) {offers};
+\node[store, right=of off] (sel) {sellers};
+\node[store, below=of var] (res) {stock\_reservations};
+\node[store, left=of var] (cart) {carts / cart\_items};
+\node[store, below=of cart] (ord) {orders / order\_items};
+\node[store, below=of ord] (pay) {payments, payment\_events, refunds};
+\node[store, left=of prod] (rev) {reviews};
+\draw[arr] (cat) -- (type);
+\draw[arr] (type) -- (attr);
+\draw[arr] (type) -- (prod);
+\draw[arr] (prod) -- (var);
+\draw[arr] (var) -- (off);
+\draw[arr] (off) -- (sel);
+\draw[arr] (var) -- (res);
+\draw[arr] (cart) -- (var);
+\draw[arr] (ord) -- (pay);
+\draw[arr] (rev) -- (prod);
+\draw[darr] (res) -- (ord);
+\end{tikzpicture}
+\caption{Simplified entity relationships. Solid arrows: references. Dashed: reservation belongs to an order by identifier.}
+\label{fig:er}
+\end{figure}
+
+Other tables: \code{promotions} (coupons), \code{product\_views}, \code{sponsored\_campaigns}, \code{users} and \code{sessions}. Money is stored as integer cents throughout, and order lines are purchase-time snapshots (title, price, SKU, seller) so that later catalogue changes never rewrite history.

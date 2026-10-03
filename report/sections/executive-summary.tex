@@ -1,0 +1,34 @@
+\chapter*{Executive Summary}
+\addcontentsline{toc}{chapter}{Executive Summary}
+\markboth{Executive Summary}{}
+
+\textbf{The challenge.} Rebuild the Amazon.com shopping experience in roughly 24 hours (the repository history spans about 22 hours, from the first commit on 2 October to the last on 3 October 2026), and be judged on speed, product judgment and UX quality.
+
+\textbf{The objective we set.} Do not produce a visual clone. The visible interface of a marketplace is the surface of a stateful system: a catalogue with typed attributes, variants that carry their own price and stock, competing seller offers, reservations that stop two customers buying the same last unit, a payment lifecycle that is separate from the order lifecycle, and ranking rules that decide what each customer sees. We built a small version of that system and made every customer-visible number (price, discount, delivery date, rating) a server-side computation.
+
+\textbf{What exists.} A Next.js application organised as a modular monolith (nine modules with enforced boundaries) on PostgreSQL, with a 2,400-product synthetic catalogue, multi-dimension variants, 608 additional seller offers on top of an implicit first-party offer, a deterministic buy-box rule, PostgreSQL full-text and trigram search with structured facets, a concept-based hybrid retrieval layer, a two-phase checkout with stock reservations, Stripe test-mode integration behind a provider interface (PaymentIntent, Payment Element, signed webhook), server-side coupons, a deterministic delivery promise, recently-viewed and deterministic recommendations, labelled sponsored placements, and verified reviews.
+
+\textbf{What is verified.} 131 unit and integration tests across 26 files pass; type checking and linting are clean; Playwright journeys cover desktop and a phone viewport, including a two-browser race for the last unit of stock. The application is deployed over HTTPS on Vercel, and the final commits are recorded as successful production deployments.
+
+\textbf{What is not verified.} A completed card payment against the live Stripe API was not performed from this repository's evidence; Stripe behaviour is covered by unit tests with real signature verification, and a key-gated end-to-end test exists but was not run. The database host in production is configured through an environment variable and is not independently confirmed here.
+
+\begin{table}[H]
+\centering
+\caption{The project at a glance (all figures from the repository).}
+\label{tab:glance}
+\small
+\begin{tabular}{@{}lr@{\qquad}lr@{}}
+\toprule
+Products & 2,400 & Database tables & 21 \\
+Product types & 43 & SQL migrations & 20 \\
+Fictional brands & 104 & Documented decisions & 32 \\
+Variants & 8,860 & Unit/integration tests & 131 (26 files) \\
+Seller offers & 608 & E2E scenarios & 12 $\times$ 2 viewports \\
+Application modules & 9 & Source under \code{src/} & $\approx$13,900 lines \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Main decisions.} PostgreSQL for everything, including search (no dedicated search engine); deterministic ranking everywhere (no machine learning); a payment-provider interface with a demo and a Stripe implementation; reservation-based inventory; and a hard rule that client-supplied prices, discounts and ``payment succeeded'' signals are never trusted.
+
+\textbf{Main constraints.} Twenty-four hours; no access to real Amazon data; no paid external services beyond Stripe's free test mode. These drove the choices in Chapters~\ref{ch:scope} and~\ref{ch:decisions}.

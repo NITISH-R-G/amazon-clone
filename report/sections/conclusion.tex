@@ -1,0 +1,12 @@
+\chapter{Final Engineering Takeaways}
+\label{ch:conclusion}
+
+\begin{itemize}
+\item \textbf{The frontend is the visible surface.} The pages that look like a shop are the output of a catalogue model, offers, reservations, a payment lifecycle and ranking rules. Most of the effort, and nearly all of the risk, sat below the interface.
+\item \textbf{Domain modelling pays for itself.} Separating product, variant and offer made variants, sellers, the buy box, the cart and order snapshots fall out of one idea rather than becoming special cases.
+\item \textbf{State transitions need an owner.} Treating inventory, payment and order as three machines, and letting only verified events move the payment machine, removed a class of bugs (double sale, order without payment, refund claimed but not made) by construction.
+\item \textbf{Customer experience depends on backend correctness.} Clear messages for an expired hold, an under-minimum coupon or a declined card are only possible because the backend returns distinct, typed outcomes.
+\item \textbf{Deterministic systems are often the right choice under a deadline.} Rules for ranking, recommendations, delivery and concept search are explainable, reproducible and testable; their limits are known and were written down instead of hidden.
+\item \textbf{Scope management is an engineering skill.} What was left out (Chapter~\ref{ch:decisions}) was chosen deliberately, and the order of work protected the purchase path first.
+\item \textbf{Reliability beats feature count.} A smaller set of features, each with tests and an honest statement of what is and is not verified, is more useful than a longer list that cannot be trusted. The unverified items in this report, chiefly a completed live Stripe payment, are the most important follow-up work.
+\end{itemize}

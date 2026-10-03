@@ -1,0 +1,57 @@
+\chapter{Problem Definition}
+\label{ch:problem}
+
+A basic storefront shows products, takes an order and sends an email. A marketplace like Amazon.com is a different kind of system, because almost every thing a customer sees is the output of a separate decision that must remain consistent with the others.
+
+\begin{table}[H]
+\centering
+\caption{What a customer sees versus what must be true behind it.}
+\label{tab:surface}
+\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+On the page & Behind it \\
+\midrule
+A product with options & A \emph{product} (the idea), \emph{variants} (the exact purchasable configurations with their own SKU, price and stock) and \emph{offers} (who sells that variant, at what price, from where). \\
+``In stock'' & A quantity that other customers are changing at the same moment, and that must not be sold twice. \\
+A price & A seller's price, a list price, a deal, a coupon, shipping rules and tax, all computed in one agreed order. \\
+Search results & Text matching, typo tolerance, structured filters whose options depend on the kind of product, and a ranking. \\
+``Arrives Tue, Oct 6'' & A promise derived from fulfilment, handling time, cut-off and destination. \\
+``Place order'' & A payment lifecycle (pending, failed, succeeded, refunded) that is not the same thing as the order lifecycle (awaiting payment, placed, shipped, delivered, cancelled). \\
+Stars and reviews & Aggregates that must match the review records, and a ``verified purchase'' flag that must mean something. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The central engineering thesis of this project follows from the table: \emph{the visible shopping interface is only the surface of a much larger stateful marketplace system}. A visual copy of the pages would show none of the hard parts. We therefore chose to reproduce the hard parts at small scale and to be explicit about where our rules are our own rather than Amazon's.
+
+\chapter{Product Scope and Product Judgment}
+\label{ch:scope}
+
+With 24 hours, the question was never ``what can we build'' but ``what must be true for a reviewer to believe this is a marketplace, and what can we leave out without losing that belief''. Table~\ref{tab:scope} records the answer. The ordering of work followed one rule from the project's instructions: protect the purchase path (browse, variant, cart, checkout, order) first, and cut decoration before correctness.
+
+\begin{table}[H]
+\centering
+\caption{Scope decisions: what was built, why, and what was deliberately deferred.}
+\label{tab:scope}
+\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{2.4cm}XXX@{}}
+\toprule
+Area & Implemented & Why it mattered & Deliberately deferred \\
+\midrule
+Catalogue & 2,400 synthetic products, 43 types with typed attributes, 104 invented brands & Scale and heterogeneity make search, facets and pagination real & Real product data and imagery (none was licensed) \\
+Variants & Up to three dimensions, SKU per variant, price/stock/picture per variant & Variant identity is the core of ``a product page'' & Bundles, subscriptions \\
+Sellers and buy box & 608 seller offers, implicit first-party offer, deterministic selection rule & Shows that one product can have several sellers & Seller dashboards, seller ratings, onboarding \\
+Search & PostgreSQL full-text and trigram, facets, typo tolerance, concept-based hybrid layer & Discovery is how customers find anything & Dedicated search engine, learned ranking \\
+Inventory & Time-limited reservations with row locking and a concurrency test & Overselling is the classic marketplace failure & Warehouses, multi-location stock \\
+Checkout and payments & Two-phase checkout, Stripe test mode behind a provider interface, idempotent webhooks, refunds & Trust: money must follow verified facts & Saved cards, live payments, fraud checks \\
+Pricing & Deals, server-side coupons, shipping and tax rules & Totals must be explainable and tamper-proof & A general promotion engine \\
+Delivery & Deterministic delivery windows on product, cart, checkout and order & ``When will it arrive'' drives purchase decisions & Carrier integration, tracking \\
+Discovery & Recently viewed, deterministic recommendations, personalised home rails, sponsored placements & Makes the home page react to the customer & Machine-learned recommendation, ad auction \\
+Reviews & Reviews with a verified-purchase flag derived from delivered orders & Trust signal with real semantics & Votes, images, moderation \\
+Accounts & Register, sign in, guest cart merge, order history; guest checkout stays open & Accounts should add history, not gate purchase & OAuth, saved addresses, returns \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Deferred items are not failures; each was weighed against its cost in the time box and against whether its absence would change what a reviewer could verify. The recorded reasoning is in the project's decision log (D1--D32).

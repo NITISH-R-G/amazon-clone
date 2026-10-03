@@ -1,0 +1,105 @@
+% Cartly engineering report. Build: see README.md in this folder.
+\documentclass[11pt,a4paper]{report}
+
+\usepackage{fontspec}
+\setmainfont{texgyreheros}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{texgyrecursor}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic,Scale=0.88]
+\usepackage[a4paper,margin=2.6cm,headheight=14pt]{geometry}
+\usepackage{microtype}
+\usepackage{setspace}
+\setstretch{1.12}
+\usepackage{parskip}
+\setlength{\parskip}{0.55em}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{booktabs,tabularx,array,longtable}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=1.4em,itemsep=0.25em}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,skip=6pt}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage[hidelinks,pdfusetitle]{hyperref}
+
+% Semantic colours only (information / success / warning / risk). Everything else is black on white.
+\definecolor{info}{HTML}{1F5FA8}
+\definecolor{ok}{HTML}{23703A}
+\definecolor{warn}{HTML}{9A6200}
+\definecolor{risk}{HTML}{A82B2B}
+\definecolor{rule}{HTML}{BBBBBB}
+\definecolor{paper}{HTML}{F4F4F4}
+
+\titleformat{\chapter}[hang]{\bfseries\LARGE}{\thechapter}{0.8em}{}[\vspace{2pt}\titlerule]
+\titlespacing*{\chapter}{0pt}{-10pt}{18pt}
+\titleformat{\section}{\bfseries\Large}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\bfseries\large}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{16pt}{6pt}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Cartly: engineering report}
+\fancyhead[R]{\small\leftmark}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{paper},
+  frame=single, rulecolor=\color{rule},
+  breaklines=true, columns=fullflexible, keepspaces=true,
+  xleftmargin=0.3em, xrightmargin=0.3em, aboveskip=8pt, belowskip=6pt,
+  showstringspaces=false
+}
+
+% Inline helpers
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\tagimpl}{\textcolor{ok}{\textbf{Implemented}}}
+\newcommand{\tagtest}{\textcolor{info}{\textbf{Tested}}}
+\newcommand{\tagplan}{\textcolor{warn}{\textbf{Not built}}}
+\newcommand{\tagunver}{\textcolor{risk}{\textbf{Not verified}}}
+
+% Callout (restrained: a rule on the left, no fill colour)
+\newcommand{\callout}[2]{%
+  \par\noindent\begin{minipage}{\dimexpr\linewidth}%
+  \noindent\rule{0.6pt}{0pt}\hspace{-0.6pt}%
+  \begin{tabular}{@{}|@{\hspace{8pt}}p{0.93\linewidth}@{}}
+  \textbf{#1}\newline #2
+  \end{tabular}%
+  \end{minipage}\par\vspace{4pt}}
+
+% TikZ styles
+\tikzset{
+  box/.style={draw, rectangle, minimum height=7mm, align=center, font=\small, inner sep=4pt},
+  mod/.style={box, fill=paper},
+  ext/.style={box, dashed},
+  store/.style={box, fill=paper, rounded corners=1pt},
+  arr/.style={-{Stealth[length=2.2mm]}, thick},
+  darr/.style={-{Stealth[length=2.2mm]}, thick, dashed},
+  lbl/.style={font=\scriptsize, midway, fill=white, inner sep=1.5pt}
+}
+
+\begin{document}
+\input{sections/titlepage}
+\tableofcontents
+\listoffigures
+\listoftables
+
+\input{sections/executive-summary}
+\input{sections/problem-scope}
+\input{sections/architecture}
+\input{sections/catalogue}
+\input{sections/search}
+\input{sections/commerce}
+\input{sections/inventory-checkout}
+\input{sections/discovery-trust}
+\input{sections/ux-performance}
+\input{sections/quality-security-deploy}
+\input{sections/decisions-limits}
+\input{sections/conclusion}
+\end{document}

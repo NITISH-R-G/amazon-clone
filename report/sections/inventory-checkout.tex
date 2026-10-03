@@ -1,0 +1,111 @@
+\chapter{Inventory Consistency, Checkout and Payments}
+\label{ch:inventory}
+
+\section{Why stock needs reservations}
+
+A naive checkout reads the stock, charges the card and decrements the stock at the end. Between the read and the write another customer can do the same, and the last unit is sold twice. Charging first and decrementing later is worse, because the failure appears after the money moved. This project instead \emph{reserves} stock when checkout starts, converts the reservation into a sale only when payment is confirmed, and releases it on failure, expiry or cancellation.
+
+\section{The reservation model}
+
+Table \code{stock\_reservations} holds one row per order, variant and offer with a quantity, an expiry time and a status: \emph{held}, \emph{committed} or \emph{released}. A unique constraint on (order, variant, offer) makes reserving idempotent. A hold lasts 15 minutes. Expiry is evaluated lazily: a hold whose time has passed is simply ignored when availability is computed, so no background job is required. \tagimpl{}
+
+To reserve, the module locks the stock row for the variant (or the offer, for seller lines), counts the unexpired holds of \emph{other} orders, and refuses if the remaining stock is smaller than the request. Lines are processed in a fixed order to avoid deadlocks, and all lines succeed or none do. Because the stock row is locked first, two customers racing for the final unit are serialised by the database: the second one sees the first one's hold and fails. Commit re-checks the same condition, so a hold that expired and was taken by someone else cannot be committed. \tagtest{}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=3.1cm, y=-0.78cm, font=\scriptsize]
+\foreach \x/\n in {0/Customer A, 1/Customer B, 2/Checkout, 3/Inventory (last unit)} {
+  \node[box, minimum width=2.4cm] (h\x) at (\x,0) {\n};
+  \draw[rule] (\x,0.6) -- (\x,13.2);
+}
+\draw[arr] (0,2) -- node[lbl,above]{start checkout} (2,2);
+\draw[arr] (1,3) -- node[lbl,above, pos=0.62]{start checkout} (2,3);
+\draw[arr] (2,4) -- node[lbl,above]{lock stock row, reserve 1} (3,4);
+\draw[darr] (3,5) -- node[lbl,above]{held for A} (2,5);
+\draw[arr] (2,6) -- node[lbl,above]{lock waits, then sees A's hold} (3,6);
+\draw[darr] (3,7) -- node[lbl,above, text=risk]{refused: 0 available} (2,7);
+\draw[darr] (2,8) -- node[lbl,above]{pay} (0,8);
+\draw[darr] (2,9) -- node[lbl,above, text=risk]{out of stock, nothing charged} (1,9);
+\draw[arr] (2,10.5) -- node[lbl,above]{payment confirmed: commit} (3,10.5);
+\draw[darr] (3,11.5) -- node[lbl,above, text=ok]{stock 1 $\to$ 0, order placed} (0,11.5);
+\end{tikzpicture}
+\caption{Two customers, one unit. The database lock serialises the reservations; only A can proceed to payment.}
+\label{fig:race}
+\end{figure}
+
+This is a single-database transactional design. It is correct for one PostgreSQL primary and would need a different mechanism (for example a dedicated inventory service) at multi-region scale; Chapter~\ref{ch:decisions} says so.
+
+\textbf{Evidence.} The module-level test starts both checkouts concurrently against the real database and asserts that exactly one succeeds; an end-to-end test drives two separate browser sessions through the checkout form at the same moment and asserts that exactly one sees ``Order placed'' and the other a sold-out message with nothing charged. Further tests cover expiry (a freed unit becomes buyable by the other customer), release on cancellation, and a late payment after expiry (the order is honoured if the unit is still free, otherwise cancelled and refunded). \tagtest{}
+
+\section{Three separate states}
+
+The central design rule of the payment system is that \emph{inventory, payment and order are three state machines that never share a field}. The order is not ``paid'' because a button was clicked; it is placed because the payment record says succeeded, and the stock is sold at that same moment.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+\node[font=\small\bfseries, anchor=west] at (-0.5,0.9) {Inventory (reservation)};
+\node[box] (h) at (1.4,0) {held};
+\node[box] (c) at (4.6,0) {committed};
+\node[box] (r) at (1.4,-1.6) {released};
+\draw[arr] (h) -- node[above]{paid} (c);
+\draw[arr] (h) -- node[right]{failure, expiry, cancel} (r);
+
+\node[font=\small\bfseries, anchor=west] at (7.4,0.9) {Payment};
+\node[box] (p) at (8.6,0) {pending};
+\node[box] (s) at (11.6,0) {succeeded};
+\node[box] (f) at (8.6,-1.6) {failed};
+\node[box] (rf) at (11.6,-1.6) {refunded};
+\draw[arr] (p) -- (s);
+\draw[arr] (p) -- (f);
+\draw[arr] (f) -- node[above, sloped]{retry} (s);
+\draw[arr] (s) -- node[right]{refund} (rf);
+
+\node[font=\small\bfseries, anchor=west] at (-0.5,-3.1) {Order};
+\node[box] (a) at (1.6,-4.0) {awaiting\_payment};
+\node[box] (pl) at (5.2,-4.0) {placed};
+\node[box] (sh) at (8.0,-4.0) {shipped};
+\node[box] (dl) at (10.8,-4.0) {delivered};
+\node[box] (ex) at (3.4,-5.6) {expired or cancelled};
+\draw[arr] (a) -- (pl);
+\draw[arr] (pl) -- (sh);
+\draw[arr] (sh) -- (dl);
+\draw[arr] (a) -- (ex);
+\draw[arr] (pl) -- (ex);
+\end{tikzpicture}
+\caption{The three state machines (scaled to fit). The order also carries a separate refund status (pending, refunded, failed). Shipped and delivered are derived from time, not stored.}
+\label{fig:states}
+\end{figure}
+
+\section{Two-phase checkout}
+
+\paragraph{Phase 1: start checkout} (one database transaction). Validate the address; take an advisory lock on the customer and idempotency key; re-read the server cart and price it, including any coupon; abandon the customer's other unpaid orders; create the order in the \emph{awaiting payment} state with purchase-time snapshots; reserve stock. Then, outside the transaction, ask the payment provider to create the payment. Starting again with the same key returns the same order; if the cart has changed meanwhile it is refused with a clear message rather than silently repriced. The cart is \emph{not} cleared yet. \tagimpl{} \tagtest{}
+
+\paragraph{Phase 2: payment event} (one transaction). A provider event is recorded and de-duplicated, the pure state function updates the payment, and only if the payment is now \emph{succeeded} does checkout commit the reservations, mark the order paid (this starts the fulfilment clock), and clear the cart. If the order was cancelled meanwhile, or the held units can no longer be committed, the order is cancelled and the money is refunded instead of being double-sold.
+
+\section{Payment provider boundary}
+
+Checkout depends on a \code{PaymentProvider} interface: create a payment, retrieve it, cancel it, refund it, verify a webhook, and (demonstration provider only) accept card details. Nothing in the interface returns ``the customer paid''; success can arrive only as a verified event or a server-side retrieval. Two implementations exist: a demonstration provider that simulates a bank (used locally and in tests) and a Stripe implementation in test mode. The application selects Stripe when a Stripe secret key is configured. \tagimpl{}
+
+\subsection{Stripe test mode}
+
+On the server, the order total is used to create a PaymentIntent with the order identifier in its metadata and an idempotency key. The browser receives only the client secret and the publishable key and renders Stripe's Payment Element; card data never touches the application server. After confirmation Stripe redirects the customer to the order page, but that redirect is not trusted. The order is placed by one of two server-side paths:
+
+\begin{enumerate}
+\item \textbf{Signed webhook.} A route handler reads the \emph{raw} request body, verifies the signature with the webhook secret, and maps recognised events (payment succeeded, failed, processing, requires action, canceled, charge refunded) into the application's own event type. Unrecognised events and events for unknown payments are acknowledged without effect; a bad signature is rejected; an internal error returns a failure so Stripe retries.
+\item \textbf{Server-side retrieval.} The payment and confirmation pages ask Stripe for the PaymentIntent and handle the answer exactly like an event, so a delayed or missing webhook cannot strand a paid order.
+\end{enumerate}
+
+\paragraph{Idempotency and ordering.} Events are recorded by provider event identifier, so a replay changes nothing. A pure state function accepts success from any open state, ignores events older than the last applied one, and allows refunds only after success; therefore a late ``failed'' event cannot undo a success. A refund row is written as pending \emph{before} the provider is called, its identifier is the provider's idempotency key, and the payment counts as refunded only when the provider says the refund succeeded. A failed refund is shown as failed and can be retried; the interface never claims a refund that has not happened.
+
+\begin{lstlisting}[caption={Rule from the payment state function, simplified.},label={lst:paystate}]
+// success wins from any non-final state; other changes only while open and not older
+if (event.type === "payment.succeeded" && !isFinal(state)) return succeeded;
+if (isOlder(event, state.lastEventAt)) return unchanged;
+\end{lstlisting}
+
+\paragraph{Evidence and its limits.} The webhook path is covered by five tests that use the real Stripe signature verification with generated signatures (replay, tampered body, missing signature, out-of-order events, unknown payment, refund after cancellation); the state machine and checkout flow are covered by the payment-flow tests. \tagtest{} A completed card payment against the live Stripe API from this repository was \emph{not} performed or recorded; the key-gated browser test for it exists but was not run. \tagunver{} In production the checkout button reads ``Continue to payment'', which indicates a Stripe key is configured, but successful settlement is unconfirmed.
+
+\section{Cancellation and refunds}
+
+Cancellation is allowed while an order is awaiting payment (the hold is released and the payment cancelled) and, for a paid order, only during the first minutes while it is still ``placed''. A paid cancellation restocks the units in the same transaction, then requests a refund from the provider and records the outcome separately from the order status.

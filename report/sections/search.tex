@@ -1,0 +1,60 @@
+\chapter{Search, Discovery and Merchandising}
+\label{ch:search}
+
+\section{Lexical retrieval}
+
+Search is a function of the catalogue module (\code{catalog.findProducts}) running against PostgreSQL. Each product row carries a generated full-text vector indexed with GIN; title and brand also have trigram indexes. A query goes through three progressively looser readings and stops at the first that finds anything:
+
+\begin{enumerate}
+\item every word must be the start of a word in the product (or its category name);
+\item the same, but a word may also be a close misspelling of a title or brand word (trigram word similarity above a threshold of 0.5, set per transaction so it never leaks across pooled connections);
+\item only half of the words (rounded up) must match, and the page then says so explicitly.
+\end{enumerate}
+
+Very common words are ignored so that nonsense such as ``this is not a product'' does not match everything, and a query made only of symbols returns nothing. Suggestions in the search box use the same machinery. \tagimpl{} \tagtest{}
+
+\section{Structured filtering and facets}
+
+Filters available on the results page are department, product type, brand, price range, minimum rating, in-stock only, on-sale, and the \emph{attribute facets of the chosen product type} (for example processor or refresh rate once ``Televisions'' is chosen). Facet counts ignore their own filter, so a customer can see what choosing another value would yield. Sorting (relevance, price, rating, newest) and bounded pagination are server-side; all state lives in the URL so results can be linked, reloaded and navigated with the back button. No query loads the whole catalogue into memory. \tagimpl{} \tagtest{}
+
+\section{Hybrid retrieval: concept-based, not embedding-based}
+
+\callout{Accuracy note}{The semantic layer is \emph{concept-based}. It does not use embeddings, a vector database, a neural model or a language model. It is a curated lexicon that maps what a query means to the product types that satisfy it.}
+
+\paragraph{What it does.} The lexicon contains 18 concepts. Each has trigger words and an ordered list of product types, for example the intent ``keeping drinks hot or cold'' (triggers such as \emph{hot}, \emph{insulated}, \emph{commute}) maps to insulated water bottles, travel tumblers and gooseneck kettles. \code{interpretQuery} scores concepts by how many triggers match and returns up to four product types, deterministically. This lets the query \emph{``something to keep my coffee hot on my commute''}, which shares no product words with an insulated bottle, return insulated bottles and travel tumblers. \tagimpl{} \tagtest{}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\node[mod] (q) at (3.6,0) {User query};
+\node[mod] (lex) at (0.5,-1.8) {Lexical retrieval\\\scriptsize full-text, trigram, filters};
+\node[mod] (con) at (6.7,-1.8) {Concept interpretation\\\scriptsize lexicon $\to$ product types};
+\node[mod] (sem) at (6.7,-3.6) {Semantic candidates\\\scriptsize top-rated of each type,\\\scriptsize same filters};
+\node[mod] (fuse) at (3.6,-5.4) {Candidate fusion\\\scriptsize deterministic score};
+\node[mod] (res) at (3.6,-7.0) {Results\\\scriptsize note states what was understood};
+\draw[arr] (q) -| (lex);
+\draw[arr] (q) -| (con);
+\draw[arr] (con) -- (sem);
+\draw[arr] (lex) |- (fuse);
+\draw[arr] (sem) |- (fuse);
+\draw[arr] (fuse) -- (res);
+\end{tikzpicture}
+\caption{Hybrid retrieval. The lexical path always runs first and is authoritative.}
+\label{fig:hybrid}
+\end{figure}
+
+\paragraph{When it runs.} The concept layer is consulted only on the first page, with relevance sorting, when no product type has been chosen, and when the words alone found fewer results than a page or only a partial match. Exact queries (``studio headphones'') are unchanged. The semantic candidates are fetched with the \emph{same} filters as the lexical ones, so price caps, brand and stock filters are respected.
+
+\paragraph{Fusion.} Each candidate list is already in rank order. The score is
+\[
+\text{score} \;=\; w_{\text{lex}}\,\frac{1}{1+r_{\text{lex}}} \;+\; w_{\text{sem}}\,\frac{1}{1+r_{\text{sem}}} \;+\; w_{\text{biz}}\,\frac{\text{rating}}{5},
+\]
+where a product absent from a list contributes zero for that term, and ties are broken by product identifier. When the lexical match was complete the weights are $(0.6, 0.3, 0.1)$; when it was partial or empty, meaning is trusted more: $(0.25, 0.65, 0.1)$. \tagtest{} (tests assert exact scores and orderings.)
+
+\paragraph{Fallback.} The whole semantic stage is wrapped so that any failure returns the plain lexical result. It depends on no external service.
+
+\paragraph{Honest boundaries.} The layer understands only what the lexicon covers. During customer-perspective testing, \emph{``cheap thing for college''} returned laptops (the word ``cheap'' is not understood) and \emph{``gift for my dad''} returned home-decor items. These are weak results of exactly the kind a learned model might improve, and they are recorded here rather than hidden. The validated demonstration query is the coffee-and-commute example above. Section~\ref{sec:future} describes how this could evolve.
+
+\section{Homepage and merchandising}
+
+The home page is generated from data, not hand-placed. Each rail has a named source and ranking: ``today's deals'' (products with a list price above the price, best rated), ``top rated'' (in stock, by rating), ``featured'' (curated rank), ``new arrivals'' (by creation date), ``sponsored'' (active campaigns, Chapter~\ref{ch:discovery}), and, once the visitor has browsing history, ``pick up where you left off'' (recently viewed) and ``recommended for you'' (Chapter~\ref{ch:discovery}). A rail with no products renders nothing. Category tiles come from the real department facet counts. \tagimpl{}
