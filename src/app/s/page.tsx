@@ -69,6 +69,11 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           </aside>
         ) : null}
         <div>
+          {result.semantic ? (
+            <p role="status" className="mb-6 rounded-lg bg-muted px-4 py-3 text-sm" data-testid="semantic-note">
+              Also showing products for what you probably mean: {result.semantic.meaning.join(", ")}.
+            </p>
+          ) : null}
           {result.relaxed && result.items.length > 0 ? (
             <p role="status" className="mb-6 rounded-lg bg-muted px-4 py-3 text-sm">
               No product matches every word in &ldquo;{query.text}&rdquo;. Showing products that match some of them.

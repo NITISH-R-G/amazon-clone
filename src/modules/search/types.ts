@@ -54,6 +54,8 @@ export type SearchResult = {
   pageSize: number;
   /** True when no product matched every word, so products matching some of the words are shown. */
   relaxed: boolean;
+  /** Set when meaning-based candidates were added to the lexical ones (what the query was understood to mean). */
+  semantic?: { meaning: string[]; addedCount: number };
   facets: { categories: CategoryFacet[]; brands: BrandFacet[]; types: TypeFacet[]; attributes: AttributeFacet[] };
 };
 
