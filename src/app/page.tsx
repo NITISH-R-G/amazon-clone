@@ -1,32 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PriceBlock } from "@/components/product/price-block";
-import { ProductGrid } from "@/components/product/product-grid";
+import { Rail } from "@/components/product/rail";
 import { Button } from "@/components/ui/button";
 import { getApp } from "@/server/runtime";
-
-function Rail({ title, href, products }: { title: string; href: string; products: Parameters<typeof ProductGrid>[0]["products"] }) {
-  return (
-    <section aria-labelledby={`rail-${title}`} className="space-y-6">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 id={`rail-${title}`} className="text-2xl leading-8 font-semibold tracking-[-0.015em]">
-          {title}
-        </h2>
-        <Link href={href} className="flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-muted-foreground">
-          View all
-        </Link>
-      </div>
-      <ProductGrid products={products} />
-    </section>
-  );
-}
+import { readActor } from "@/server/session";
 
 export default async function HomePage() {
   const app = await getApp();
-  const [featured, sale, newest] = await Promise.all([
+  const actor = await readActor();
+  const [featured, sale, trending, newest, viewed, forYou] = await Promise.all([
     app.search.searchProducts({ sort: "featured", pageSize: 4 }),
     app.search.searchProducts({ onSale: true, sort: "rating", pageSize: 4 }),
+    app.search.searchProducts({ sort: "rating", inStockOnly: true, pageSize: 4 }),
     app.search.searchProducts({ sort: "newest", pageSize: 4 }),
+    app.discovery.recentlyViewed(actor, 4),
+    app.discovery.forYou(actor, 4),
   ]);
   const hero = featured.items[0];
 
@@ -83,9 +72,13 @@ export default async function HomePage() {
         </ul>
       </section>
 
-      <Rail title="Featured" href="/s" products={featured.items} />
-      <Rail title="On sale" href="/s?sale=1" products={sale.items} />
-      <Rail title="New arrivals" href="/s?sort=newest" products={newest.items} />
+      {/* Personal rails come first when there is history; every rail has a real source and ranking. */}
+      <Rail id="recently-viewed" title="Pick up where you left off" subtitle="Recently viewed" products={viewed} />
+      <Rail id="for-you" title="Recommended for you" subtitle="Based on your recent views" products={forYou} />
+      <Rail id="deals" title="Today's deals" subtitle="Biggest savings on in-stock products" href="/s?sale=1&sort=rating" products={sale.items} />
+      <Rail id="trending" title="Top rated" subtitle="Best-rated products in stock" href="/s?sort=rating" products={trending.items} />
+      <Rail id="featured" title="Featured" href="/s" products={featured.items} />
+      <Rail id="new" title="New arrivals" href="/s?sort=newest" products={newest.items} />
     </div>
   );
 }

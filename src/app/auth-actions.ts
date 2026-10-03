@@ -44,6 +44,7 @@ async function startSession(userId: string, token: string, expiresAt: Date) {
   if (guest && "guestToken" in guest) {
     await app.cart.mergeGuestCart(guest.guestToken, userId);
     await app.orders.claimGuestOrders(guest.guestToken, userId);
+    await app.discovery.claimGuestViews(guest.guestToken, userId);
     await clearGuestToken();
   }
   revalidatePath("/", "layout");

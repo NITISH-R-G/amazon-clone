@@ -59,6 +59,8 @@ export type TextMatch = { tokens: string[]; mode: "all" | "fuzzy" | "partial"; i
 
 export type ProductCriteria = {
   text?: TextMatch;
+  /** Only these products (used to load a known set, e.g. recently viewed). */
+  ids?: string[];
   categorySlug?: string;
   /** A product type (smartphones, sofas): brings its own attribute facets. */
   typeSlug?: string;

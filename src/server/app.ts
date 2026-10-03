@@ -5,6 +5,7 @@ import { createAuth } from "@/modules/auth";
 import { createCart } from "@/modules/cart";
 import { createCatalog } from "@/modules/catalog";
 import { createCheckout } from "@/modules/checkout";
+import { createDiscovery } from "@/modules/discovery";
 import { createOrders } from "@/modules/orders";
 import { createPayments } from "@/modules/payments";
 import { createSearch } from "@/modules/search";
@@ -33,7 +34,8 @@ export function createApp({ db, clock, ids, payments }: AppDeps) {
   const checkout = createCheckout({ db, cart, catalog, orders, payments: paymentService, clock, ids });
   const search = createSearch({ catalog });
   const auth = createAuth({ db, clock, ids });
-  return { db, catalog, cart, orders, payments: paymentService, checkout, search, auth };
+  const discovery = createDiscovery({ db, clock, catalog, search });
+  return { db, catalog, cart, orders, discovery, payments: paymentService, checkout, search, auth };
 }
 
 export type App = ReturnType<typeof createApp>;

@@ -7,6 +7,7 @@ export const SORT_KEYS: readonly SortKey[] = ["featured", "price-asc", "price-de
 
 export type SearchQuery = {
   text?: string;
+  ids?: string[];
   categorySlug?: string;
   typeSlug?: string;
   /** Attribute filters by key (only the type's facet attributes apply). */

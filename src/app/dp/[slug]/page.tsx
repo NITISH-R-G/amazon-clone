@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Rail } from "@/components/product/rail";
+import { ViewTracker } from "@/components/product/view-tracker";
 import { PurchaseGallery } from "@/components/product/purchase-gallery";
-import { ProductGrid } from "@/components/product/product-grid";
 import { ProductSpecs } from "@/components/product/product-specs";
 import { LivePrice, PurchaseProvider } from "@/components/product/purchase-context";
 import { PurchasePanel } from "@/components/product/purchase-panel";
@@ -10,6 +11,7 @@ import { RatingStars } from "@/components/product/rating-stars";
 import { formatUsd } from "@/lib/money";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
 import { getApp } from "@/server/runtime";
+import { readActor } from "@/server/session";
 
 export async function generateMetadata({ params }: PageProps<"/dp/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -53,12 +55,14 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       ...(offerMap[v.id] ?? []),
     ],
   }));
-  // Related: the best-rated products of the same department, without this one.
-  const related = category
-    ? (await app.search.searchProducts({ categorySlug: category.slug, sort: "rating", pageSize: 5 })).items
-        .filter((p) => p.slug !== product.slug)
-        .slice(0, 4)
-    : [];
+  const actor = await readActor();
+  const [related, viewed, forYou] = await Promise.all([
+    app.discovery.relatedTo(product.id, 4),
+    app.discovery.recentlyViewed(actor, 6, product.id),
+    app.discovery.forYou(actor, 8),
+  ]);
+  const relatedIds = new Set(related.map((p) => p.id));
+  const alsoLike = forYou.filter((p) => p.id !== product.id && !relatedIds.has(p.id)).slice(0, 4);
   const deliveryEstimate = new Date().toISOString();
   const shippingNote = `Free shipping on orders over ${formatUsd(FREE_SHIPPING_THRESHOLD_CENTS)}, otherwise ${formatUsd(FLAT_SHIPPING_CENTS)}. Payment is simulated in this demo.`;
 
@@ -111,19 +115,12 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         <ProductSpecs specs={product.specs} />
       </div>
     </article>
-    {related.length > 0 ? (
-      <section aria-labelledby="related" className="mt-20 space-y-6 border-t pt-10">
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="related" className="text-xl font-semibold tracking-[-0.01em]">
-            More in {category?.name}
-          </h2>
-          <Link href={`/s?c=${category?.slug}&sort=rating`} className="flex min-h-11 items-center text-sm font-medium underline underline-offset-4 hover:text-muted-foreground">
-            View all
-          </Link>
-        </div>
-        <ProductGrid products={related} />
-      </section>
-    ) : null}
+    <div className="mt-20 space-y-16 border-t pt-10">
+      <Rail id="related" title="Related products" subtitle="Similar products, ranked by type, brand, price and rating" href={category ? `/s?c=${category.slug}&sort=rating` : undefined} products={related} />
+      <Rail id="based-on-views" title="Based on your recent views" products={alsoLike} />
+      <Rail id="recently-viewed" title="Recently viewed" products={viewed} />
+    </div>
+    <ViewTracker productId={product.id} />
     </PurchaseProvider>
   );
 }

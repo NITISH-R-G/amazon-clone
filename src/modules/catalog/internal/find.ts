@@ -86,6 +86,7 @@ function conditions(f: Filters, scope: Scope, skip: Skip = {}): SQL[] {
     const text = textCondition(f.text);
     if (text) out.push(text);
   }
+  if (f.ids) out.push(f.ids.length > 0 ? inArray(products.id, f.ids) : sql`false`);
   if (!skip.category && f.categorySlug) out.push(eq(categories.slug, f.categorySlug));
   if (!skip.brand && f.brands && f.brands.length > 0) out.push(inArray(products.brand, f.brands));
   if (!skip.type && scope.typeId !== undefined) {

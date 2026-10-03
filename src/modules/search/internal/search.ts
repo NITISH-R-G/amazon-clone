@@ -90,6 +90,7 @@ export function createSearch({ catalog }: SearchDeps) {
     const { found, relaxed } = await run(
       query,
       {
+        ids: query.ids,
         categorySlug: query.categorySlug,
         typeSlug: query.typeSlug,
         attributes: query.attributes,
