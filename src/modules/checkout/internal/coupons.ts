@@ -37,5 +37,5 @@ export const couponMessages: Record<CouponError, (min?: Cents) => string> = {
   UNKNOWN_CODE: () => "That code is not valid.",
   NOT_STARTED: () => "That code is not active yet.",
   EXPIRED: () => "That code has expired.",
-  MIN_SPEND: (min) => `Spend at least $${((min ?? 0) / 100).toFixed(2)} on items to use this code.`,
+  MIN_SPEND: (min) => (min ? `Spend at least $${(min / 100).toFixed(2)} on items to use this code.` : "Your items do not reach the minimum spend for this code."),
 };

@@ -91,15 +91,15 @@ export function createCheckout({ db, cart, catalog, orders, payments, clock, ids
   const holdUntil = () => new Date(clock.now().getTime() + HOLD_MINUTES * 60_000);
   const reserveLines = (o: Order) => o.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, offerId: i.offerId }));
 
-  type Priced = { quote: Quote; coupon: AppliedCoupon | null; couponError: CouponError | null };
+  type Priced = { quote: Quote; coupon: AppliedCoupon | null; couponError: CouponError | null; couponMinCents: number | null };
 
   /** Prices a cart, applying the coupon if there is one and it is valid. Always server side. */
   async function price(current: Parameters<typeof quoteCart>[0], code: string | null | undefined, d: DbOrTx = db): Promise<Priced> {
-    if (!code || !normaliseCode(code)) return { quote: quoteCart(current), coupon: null, couponError: null };
+    if (!code || !normaliseCode(code)) return { quote: quoteCart(current), coupon: null, couponError: null, couponMinCents: null };
     const [row] = await d.select().from(promotions).where(eq(promotions.code, normaliseCode(code))).limit(1);
     const applied = applyCoupon((row as Promotion | undefined) ?? null, current.subtotalCents, clock.now());
-    if (!applied.ok) return { quote: quoteCart(current), coupon: null, couponError: applied.error };
-    return { quote: quoteCart(current, applied.coupon.discountCents), coupon: applied.coupon, couponError: null };
+    if (!applied.ok) return { quote: quoteCart(current), coupon: null, couponError: applied.error, couponMinCents: applied.minSubtotalCents ?? null };
+    return { quote: quoteCart(current, applied.coupon.discountCents), coupon: applied.coupon, couponError: null, couponMinCents: null };
   }
 
   async function getQuote(actor: Actor, couponCode?: string | null): Promise<Result<Priced, CheckoutError>> {

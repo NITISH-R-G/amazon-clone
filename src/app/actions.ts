@@ -223,7 +223,7 @@ export async function applyCouponAction(formData: FormData): Promise<void> {
   const app = await getApp();
   const quote = await app.checkout.getQuote(actor, code);
   if (!quote.ok) redirect("/cart");
-  if (quote.value.couponError) redirect(`/cart?coupon_error=${quote.value.couponError}`);
+  if (quote.value.couponError) redirect(`/cart?coupon_error=${quote.value.couponError}${quote.value.couponMinCents ? `&coupon_min=${quote.value.couponMinCents}` : ""}`);
   await setCoupon(code);
   revalidatePath("/", "layout");
   redirect("/cart");

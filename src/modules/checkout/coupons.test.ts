@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTestApp } from "@/test-support/app";
-import { applyCoupon, type Promotion } from "./internal/coupons";
+import { applyCoupon, couponMessages, type Promotion } from "./internal/coupons";
 
 const promo = (over: Partial<Promotion> = {}): Promotion => ({
   code: "X",
@@ -51,4 +51,15 @@ describe("coupons through checkout (server-side pricing)", () => {
     }
     await app.close();
   });
+
+  it("T132: an under-minimum result carries that code's own minimum; SAVE10 still applies above its minimum", async () => {
+    const app = await createTestApp();
+    await app.cart.addItem(g1, "var-mug", 1); // 1,200: below both minimums
+    expect(await app.checkout.getQuote(g1, "WELCOME5")).toMatchObject({ ok: true, value: { couponError: "MIN_SPEND", couponMinCents: 2500 } });
+    expect(await app.checkout.getQuote(g1, "SAVE10")).toMatchObject({ ok: true, value: { couponError: "MIN_SPEND", couponMinCents: 5000 } });
+    expect(couponMessages.MIN_SPEND(2500)).toBe("Spend at least $25.00 on items to use this code.");
+    await app.cart.addItem(g1, "var-kettle", 2); // subtotal 7,198
+    expect(await app.checkout.getQuote(g1, "SAVE10")).toMatchObject({ ok: true, value: { couponError: null, coupon: { code: "SAVE10", discountCents: 719 } } });
+    await app.close();
+  }, 120_000);
 });

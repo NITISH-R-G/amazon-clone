@@ -39,6 +39,8 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const priced = actor && cart.lines.length > 0 ? await app.checkout.getQuote(actor, await readCoupon()) : null;
   const quote = priced?.ok ? priced.value.quote : { ...quoteCart(cart) };
   const coupon = priced?.ok ? priced.value.coupon : null;
+  const couponMinParam = Number(one("coupon_min"));
+  const couponMin = (priced?.ok ? priced.value.couponMinCents : null) ?? (Number.isInteger(couponMinParam) && couponMinParam > 0 ? couponMinParam : undefined);
   const couponError = (priced?.ok ? priced.value.couponError : null) ?? (one("coupon_error") as CouponError | undefined) ?? null;
   const savingsCents = cart.lines.reduce((sum, l) => sum + (l.listPriceCents ? (l.listPriceCents - l.unitPriceCents) * l.quantity : 0), 0);
 
@@ -193,7 +195,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 </div>
                 {couponError ? (
                   <p role="alert" className="text-sm font-medium text-destructive">
-                    {couponMessages[couponError](5000)}
+                    {couponMessages[couponError](couponMin)}
                   </p>
                 ) : null}
               </form>

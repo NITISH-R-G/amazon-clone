@@ -35,7 +35,7 @@ describe("checkout quote", () => {
     const quote = await app.checkout.getQuote({ guestToken: "g1" });
     expect(quote).toEqual({
       ok: true,
-      value: { quote: { subtotalCents: 5998, discountCents: 0, shippingCents: 0, taxCents: 480, totalCents: 6478 }, coupon: null, couponError: null },
+      value: { quote: { subtotalCents: 5998, discountCents: 0, shippingCents: 0, taxCents: 480, totalCents: 6478 }, coupon: null, couponError: null, couponMinCents: null },
     });
 
     expect(await app.checkout.getQuote({ guestToken: "g2" })).toEqual({ ok: false, error: "EMPTY_CART" });
