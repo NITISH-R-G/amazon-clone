@@ -134,6 +134,13 @@
       "when": 1791003466965,
       "tag": "0018_sponsored",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791003803651,
+      "tag": "0019_hot_path_indexes",
+      "breakpoints": true
     }
   ]
 }
