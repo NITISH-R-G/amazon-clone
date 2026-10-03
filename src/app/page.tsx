@@ -4,11 +4,11 @@ import { PriceBlock } from "@/components/product/price-block";
 import { Rail } from "@/components/product/rail";
 import { Button } from "@/components/ui/button";
 import { getApp } from "@/server/runtime";
-import { readActor } from "@/server/session";
+import { readViewer } from "@/server/viewer";
 
 export default async function HomePage() {
   const app = await getApp();
-  const actor = await readActor();
+  const actor = await readViewer();
   const [featured, sale, trending, newest, viewed, forYou, ads] = await Promise.all([
     app.search.searchProducts({ sort: "featured", pageSize: 4 }),
     app.search.searchProducts({ onSale: true, sort: "rating", pageSize: 4 }),

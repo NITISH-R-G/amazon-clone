@@ -2,6 +2,7 @@
 
 // Thin orchestration (docs/modules.md rule 3): auth issues the session, then the app layer
 // hands the guest's cart and orders to the account. Neither module knows about the other.
+import { clearViewer, readViewerToken } from "@/server/viewer";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -44,8 +45,12 @@ async function startSession(userId: string, token: string, expiresAt: Date) {
   if (guest && "guestToken" in guest) {
     await app.cart.mergeGuestCart(guest.guestToken, userId);
     await app.orders.claimGuestOrders(guest.guestToken, userId);
-    await app.discovery.claimGuestViews(guest.guestToken, userId);
     await clearGuestToken();
+  }
+  const viewer = await readViewerToken();
+  if (viewer) {
+    await app.discovery.claimGuestViews(viewer, userId);
+    await clearViewer();
   }
   revalidatePath("/", "layout");
 }

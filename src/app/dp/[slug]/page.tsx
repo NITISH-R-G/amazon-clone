@@ -12,7 +12,8 @@ import { RatingStars } from "@/components/product/rating-stars";
 import { formatUsd } from "@/lib/money";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
 import { getApp } from "@/server/runtime";
-import { readActor, readUser } from "@/server/session";
+import { readUser } from "@/server/session";
+import { readViewer } from "@/server/viewer";
 
 export async function generateMetadata({ params }: PageProps<"/dp/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -56,7 +57,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       ...(offerMap[v.id] ?? []),
     ],
   }));
-  const [actor, user] = await Promise.all([readActor(), readUser()]);
+  const [actor, user] = await Promise.all([readViewer(), readUser()]);
   const [reviewSummary, reviewList, eligibility] = await Promise.all([
     app.reviews.summary(product.id),
     app.reviews.list(product.id, 6),
