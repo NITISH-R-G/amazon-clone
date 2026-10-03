@@ -6,13 +6,13 @@ import { PriceBlock } from "./price-block";
 import { QuickAdd } from "./quick-add";
 import { RatingStars } from "./rating-stars";
 
-type Props = { product: ProductSummary; priority?: boolean };
+type Props = { product: ProductSummary; priority?: boolean; sponsored?: boolean };
 
 /**
  * Image-first product card: no card chrome. The image, title, rating and price are one link;
  * the add action sits outside the link so interactive elements never nest.
  */
-export function ProductCard({ product, priority = false }: Props) {
+export function ProductCard({ product, priority = false, sponsored = false }: Props) {
   const { slug, title, imageUrl, imageAlt, priceCents, listPriceCents, rating, ratingCount, availability, singleVariantId } = product;
   return (
     <article className="group flex flex-col">
@@ -31,6 +31,7 @@ export function ProductCard({ product, priority = false }: Props) {
           ) : null}
         </div>
         <div className="space-y-1">
+          {sponsored ? <p className="text-xs font-medium text-muted-foreground">Sponsored</p> : null}
           <h3 className="line-clamp-2 text-[15px] leading-5 font-medium">{title}</h3>
           {ratingCount > 0 ? <RatingStars rating={rating} count={ratingCount} /> : null}
           <PriceBlock cents={priceCents} listCents={listPriceCents} size="sm" />

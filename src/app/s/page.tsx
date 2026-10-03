@@ -21,6 +21,10 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
   const query = parseSearchParams(await searchParams);
   const app = await getApp();
   const result = await app.search.searchProducts(query);
+  const ads =
+    query.page === 1 && query.text
+      ? await app.discovery.sponsored({ placement: "search", text: query.text, limit: 2, excludeIds: result.items.map((p) => p.id) })
+      : [];
   const allCategories = result.items.length === 0 ? await app.catalog.listCategories() : [];
 
   const categoryName = result.facets.categories.find((c) => c.slug === query.categorySlug)?.name;
@@ -72,6 +76,11 @@ export default async function ResultsPage({ searchParams }: PageProps<"/s">) {
           ) : null}
           {result.items.length > 0 ? (
             <>
+              {ads.length > 0 ? (
+                <section aria-label="Sponsored products" className="mb-8 border-b pb-8" data-testid="sponsored">
+                  <ProductGrid products={ads} dense sponsored />
+                </section>
+              ) : null}
               <h2 className="sr-only">Products</h2>
               <ProductGrid products={result.items} dense />
               <ResultsPagination query={query} page={result.page} pageCount={result.pageCount} />

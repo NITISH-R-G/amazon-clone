@@ -9,13 +9,14 @@ import { readActor } from "@/server/session";
 export default async function HomePage() {
   const app = await getApp();
   const actor = await readActor();
-  const [featured, sale, trending, newest, viewed, forYou] = await Promise.all([
+  const [featured, sale, trending, newest, viewed, forYou, ads] = await Promise.all([
     app.search.searchProducts({ sort: "featured", pageSize: 4 }),
     app.search.searchProducts({ onSale: true, sort: "rating", pageSize: 4 }),
     app.search.searchProducts({ sort: "rating", inStockOnly: true, pageSize: 4 }),
     app.search.searchProducts({ sort: "newest", pageSize: 4 }),
     app.discovery.recentlyViewed(actor, 4),
     app.discovery.forYou(actor, 4),
+    app.discovery.sponsored({ placement: "home", limit: 4 }),
   ]);
   const hero = featured.items[0];
 
@@ -77,6 +78,7 @@ export default async function HomePage() {
       <Rail id="for-you" title="Recommended for you" subtitle="Based on your recent views" products={forYou} />
       <Rail id="deals" title="Today's deals" subtitle="Biggest savings on in-stock products" href="/s?sale=1&sort=rating" products={sale.items} />
       <Rail id="trending" title="Top rated" subtitle="Best-rated products in stock" href="/s?sort=rating" products={trending.items} />
+      <Rail id="sponsored" title="Sponsored" subtitle="Promoted by sellers. Organic ranking is unchanged." products={ads} sponsored />
       <Rail id="featured" title="Featured" href="/s" products={featured.items} />
       <Rail id="new" title="New arrivals" href="/s?sort=newest" products={newest.items} />
     </div>

@@ -9,7 +9,9 @@ export function Rail({
   subtitle,
   href,
   products,
+  sponsored = false,
 }: {
+  sponsored?: boolean;
   id: string;
   title: string;
   subtitle?: string;
@@ -32,7 +34,7 @@ export function Rail({
           </Link>
         ) : null}
       </div>
-      <ProductGrid products={products} />
+      <ProductGrid products={products} sponsored={sponsored} />
     </section>
   );
 }

@@ -1,10 +1,10 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/lib/db";
 import type { Clock } from "@/lib/ports";
 import { actorKey, type Actor } from "@/lib/result";
 import type { Catalog, Product } from "@/modules/catalog";
 import type { ProductSummary, Search } from "@/modules/search";
-import { productViews } from "../schema";
+import { productViews, sponsoredCampaigns } from "../schema";
 import { rank, type Candidate, type Signals } from "../score";
 
 export type DiscoveryDeps = {
@@ -123,6 +123,43 @@ export function createDiscovery({ db, clock, catalog, search }: DiscoveryDeps) {
     return (row?.n ?? 0) > 0;
   }
 
+  /**
+   * Sponsored products for a placement: active campaigns with budget left whose keywords match the query (search
+   * only), highest bid first (ties on id). Products already in the organic results are skipped, so a sponsored product
+   * never appears twice. Organic ranking is never changed.
+   */
+  async function sponsored(input: { placement: "search" | "home"; text?: string; limit: number; excludeIds?: string[] }): Promise<ProductSummary[]> {
+    const now = clock.now();
+    const campaigns = await db
+      .select()
+      .from(sponsoredCampaigns)
+      .where(
+        and(
+          eq(sponsoredCampaigns.placement, input.placement),
+          lte(sponsoredCampaigns.startsAt, now),
+          gt(sponsoredCampaigns.endsAt, now),
+          sql`${sponsoredCampaigns.spentCents} < ${sponsoredCampaigns.budgetCents}`,
+        ),
+      )
+      .orderBy(desc(sponsoredCampaigns.bidCents), sponsoredCampaigns.id)
+      .limit(200);
+    const words = (input.text ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    const targeted =
+      input.placement === "home"
+        ? campaigns
+        : words.length === 0
+          ? []
+          : campaigns.filter((c) => c.keywords.some((k) => words.some((w) => k.startsWith(w) || w.startsWith(k))));
+    const skip = new Set(input.excludeIds ?? []);
+    const ids: string[] = [];
+    for (const c of targeted) {
+      if (!skip.has(c.productId) && !ids.includes(c.productId)) ids.push(c.productId);
+      if (ids.length >= input.limit * 3) break;
+    }
+    const found = await summaries(ids);
+    return found.filter((p) => p.availability !== "out_of_stock").slice(0, input.limit);
+  }
+
   /** After sign-in: what a guest looked at joins the account's history. */
   async function claimGuestViews(guestToken: string, userId: string): Promise<void> {
     await db.execute(sql`
@@ -132,7 +169,7 @@ export function createDiscovery({ db, clock, catalog, search }: DiscoveryDeps) {
     await db.delete(productViews).where(eq(productViews.ownerKey, actorKey({ guestToken })));
   }
 
-  return { recordView, recentlyViewed, relatedTo, forYou, hasHistory, claimGuestViews };
+  return { sponsored, recordView, recentlyViewed, relatedTo, forYou, hasHistory, claimGuestViews };
 }
 
 export type Discovery = ReturnType<typeof createDiscovery>;

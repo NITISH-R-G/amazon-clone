@@ -1,5 +1,5 @@
 import { count, eq, sql } from "drizzle-orm";
-import { products, reviews, variants } from "@/db/schema";
+import { products, reviews, sponsoredCampaigns, variants } from "@/db/schema";
 import { createSystemIds, systemClock } from "@/lib/ports";
 import { createAuth } from "@/modules/auth";
 import { createOrders } from "@/modules/orders";
@@ -88,7 +88,27 @@ export async function seedDemoExtras(db: Database) {
       where r.product_id = p.id`);
   });
 
+  await seedCampaigns(db);
   await seedDemoAccount(db);
+}
+
+/** Sponsored campaigns for a few dozen well-rated products: search keywords from the title, bids from the seeded PRNG. */
+async function seedCampaigns(db: Database) {
+  const top = await db
+    .select({ id: products.id, title: products.title, brand: products.brand })
+    .from(products)
+    .orderBy(sql`${products.ratingTenths} desc, ${products.ratingCount} desc, ${products.id}`)
+    .limit(80);
+  const rng = mulberry32(2026);
+  const startsAt = new Date("2026-01-01T00:00:00Z");
+  const endsAt = new Date("2028-12-31T00:00:00Z");
+  const rows: (typeof sponsoredCampaigns.$inferInsert)[] = top.flatMap((p, i) => {
+    const keywords = [...new Set(`${p.title} ${p.brand}`.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4))].slice(0, 6);
+    const bidCents = 20 + Math.floor(rng() * 130);
+    const base = { productId: p.id, keywords, bidCents, budgetCents: 500_000, startsAt, endsAt };
+    return i < 12 ? [{ ...base, placement: "search" as const }, { ...base, placement: "home" as const }] : [{ ...base, placement: "search" as const }];
+  });
+  await db.insert(sponsoredCampaigns).values(rows);
 }
 
 /** The demo account with three delivered orders (placed days ago), so reviews and order history have substance. */
