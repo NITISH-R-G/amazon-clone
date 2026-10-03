@@ -67,3 +67,12 @@ Production build, `PGLITE_DIR` on disk. Registered a user and placed an order, t
 | Fly, Railway, Render, Netlify, Cloudflare, AWS, GCP, Azure CLIs | Not installed. |
 | Docker | Installed, daemon not running. |
 | Database credentials or deploy-related environment variables | None. |
+
+## Stripe (test mode) on Vercel
+
+Set in Vercel (Production and Preview), never in git: `DATABASE_URL` (Neon pooled string), `STRIPE_SECRET_KEY` (`sk_test_...`), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`), `STRIPE_WEBHOOK_SECRET` (`whsec_...`).
+
+1. In the Stripe dashboard (test mode) add a webhook endpoint `https://<your-domain>/api/webhooks/stripe` for `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.processing`, `payment_intent.requires_action`, `payment_intent.canceled` and `charge.refunded`. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+2. Locally: `stripe listen --forward-to localhost:3000/api/webhooks/stripe` prints a `whsec_...` for `.env.local`.
+3. Redeploy after changing environment variables. `pnpm db:setup` (run by `vercel-build`) migrates and seeds, including reviews, campaigns and the demo account.
+4. Verify: pay `4242 4242 4242 4242`; the order appears; Stripe dashboard shows the webhook delivered. Redeliver the same event: nothing changes.

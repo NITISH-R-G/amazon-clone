@@ -260,6 +260,29 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 - **Idempotency:** same start key returns the same order (a changed cart is refused); provider events are deduplicated by event id; a refund row exists (pending) before the provider is called and its id is the provider idempotency key. A failed refund is shown as failed, never as refunded.
 - Unpaid orders are not order history. Orders created before this change are backfilled as paid.
 
+## D28. Stripe in test mode behind the PaymentProvider port
+
+- Stripe PaymentIntents with the Payment Element. The amount is always the server's order total; the browser receives only the PaymentIntent client secret and the publishable key. The secret key and webhook secret exist only in server environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`); without a secret key the demo provider is used (local dev, tests).
+- **Success is never taken from the browser.** The order is placed only by a verified, signed webhook (`/api/webhooks/stripe`, raw body, Node runtime) or by the server asking Stripe for the PaymentIntent (the confirmation and payment pages do this, so a late or missing webhook cannot strand a paid order).
+- Webhook events are mapped to our own `PaymentEvent`s and handled idempotently (event ids deduplicated, older events ignored, success accepted from any open state). Refunds on cancellation use the refund row id as Stripe's idempotency key and are only recorded as refunded when Stripe says so.
+- Test cards are shown on the payment page. 4242... succeeds, 4000 0000 0000 0002 declines, 4000 0000 0000 9995 is insufficient funds, 4000 0027 6000 3184 requires 3-D Secure.
+
+## D29. Marketplace depth: buy box, delivery promise, coupons
+
+- **Buy box (our rule, not Amazon's):** among in-stock offers, those within 2% of the lowest landed price (price plus shipping) are contenders; Cartly-fulfilled beats seller-fulfilled, then first-party, shorter handling time, lower landed price, then offer id (`catalog/offers.ts`, pure and tested).
+- **Delivery promise (deterministic, `catalog/delivery.ts`):** 15:00 UTC cut-off, business days only, Cartly ships the day processing starts, sellers add one business day plus one per 12 hours of handling, transit 2/3/4 business days by ZIP first digit, shown as a one-day window. Shown on the product page, other sellers, cart, checkout and order. (The order status timeline is the separate compressed demo clock of D24.)
+- **Deals** are list-price reductions on the offer ("Save 25%"). **Coupons** (`SAVE10`, `WELCOME5`; `SPRING20` is expired on purpose) are a server-side table with validity window and minimum spend; the client sends a code, never an amount; the discount, code and total are stored on the order.
+
+## D30. Discovery: recently viewed, recommendations, sponsored
+
+- Recently viewed is stored per signed-in user or guest (`product_views`) and merged on sign-in. Recommendations are a transparent weighted score (type, category, brand, shared attributes, price proximity, rating, popularity, sale), computed from a bounded candidate pool, ties broken by id: deterministic, no machine learning (`discovery/score.ts`).
+- The home page rails each have a real source: recently viewed and recommended-for-you (only with history), deals, top rated, featured, new arrivals, sponsored.
+- Sponsored placements are campaigns (product, placement, keywords, bid, budget, window) returned separately from organic results, always labelled "Sponsored", ordered by bid; they never change organic ranking.
+
+## D31. Verified reviews
+
+- Reviews carry rating, title, body and a verified flag that only the service sets, from a delivered order of the signed-in user containing the product; one review per user and product. The displayed rating and count of a product are the aggregate of its reviews. Seeded reviews and reviewers are invented. Demo account: `demo@cartly.test` / `cartly-demo-1` (three delivered orders).
+
 ## Review log
 
 | Date | Decision | Change |
