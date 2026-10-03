@@ -1,0 +1,27 @@
+{
+  "description": "8x: capture only human prompts and final Codex responses.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/capture.cjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/capture.cjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

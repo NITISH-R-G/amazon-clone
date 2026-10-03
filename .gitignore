@@ -20,3 +20,5 @@ test-results/
 next-env.d.ts
 *.tsbuildinfo
 /data/
+
+/.codex/capture-state/
