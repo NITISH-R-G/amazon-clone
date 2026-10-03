@@ -49,6 +49,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Not application source:
     ".claude/**",
+    ".codex/**",
     "recon/**",
     "recon-v2/**",
     "docs/**",
