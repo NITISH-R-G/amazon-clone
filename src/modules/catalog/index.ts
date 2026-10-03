@@ -22,3 +22,4 @@ export type {
 } from "./types";
 export * from "./variants";
 export * from "./offers";
+export * from "./delivery";

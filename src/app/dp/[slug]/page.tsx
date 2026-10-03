@@ -9,7 +9,6 @@ import { PurchasePanel } from "@/components/product/purchase-panel";
 import { RatingStars } from "@/components/product/rating-stars";
 import { formatUsd } from "@/lib/money";
 import { FLAT_SHIPPING_CENTS, FREE_SHIPPING_THRESHOLD_CENTS } from "@/modules/checkout";
-import { estimatedDeliveryFrom } from "@/modules/orders";
 import { getApp } from "@/server/runtime";
 
 export async function generateMetadata({ params }: PageProps<"/dp/[slug]">): Promise<Metadata> {
@@ -60,7 +59,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         .filter((p) => p.slug !== product.slug)
         .slice(0, 4)
     : [];
-  const deliveryEstimate = estimatedDeliveryFrom(new Date()).toISOString();
+  const deliveryEstimate = new Date().toISOString();
   const shippingNote = `Free shipping on orders over ${formatUsd(FREE_SHIPPING_THRESHOLD_CENTS)}, otherwise ${formatUsd(FLAT_SHIPPING_CENTS)}. Payment is simulated in this demo.`;
 
   return (

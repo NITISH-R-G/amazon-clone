@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MAX_PER_SELECTION } from "@/lib/limits";
 import { formatUsd } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { LocalTime } from "@/components/orders/local-time";
+import { DeliveryLine } from "./delivery-line";
 import { availabilityState } from "@/modules/catalog/offers";
 import { AvailabilityMessage } from "./availability-message";
 import { OtherSellers } from "./other-sellers";
@@ -21,7 +21,7 @@ type Props = {
   title: string;
   /** Delivery line derived from the checkout shipping rules. */
   shippingNote: string;
-  /** ISO time an order placed now is expected to arrive (same timeline as orders). */
+  /** ISO time of the page render: the delivery promise is computed from it. */
   deliveryEstimate: string;
 };
 
@@ -36,8 +36,6 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
   const [state, action, pending] = useActionState<FormState, FormData>(addToCartAction, {});
   const soldOut = buyBox.stock < 1;
   const max = Math.min(buyBox.stock, MAX_PER_SELECTION);
-  // The seller's handling time pushes the delivery estimate back.
-  const estimate = new Date(new Date(deliveryEstimate).getTime() + buyBox.handlingMinutes * 60_000).toISOString();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [barVisible, setBarVisible] = useState(false);
@@ -135,10 +133,9 @@ export function PurchasePanel({ title, shippingNote, deliveryEstimate }: Props) 
           </Button>
         </form>
         {soldOut ? null : (
-          <p className="text-sm">
-            <span className="font-medium">Get it by </span>
-            <LocalTime iso={estimate} />
-            <span className="text-muted-foreground"> if you order now (demo delivery timeline)</span>
+          <p className="text-sm text-muted-foreground">
+            <DeliveryLine nowIso={deliveryEstimate} legs={[buyBox]} className="text-foreground" />
+            <span> if you order now. Exact date at checkout.</span>
           </p>
         )}
         <p id="purchase-note" className="text-sm text-muted-foreground">

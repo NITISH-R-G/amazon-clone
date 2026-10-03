@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { formatUsd } from "@/lib/money";
+import { deliveryPromise, slowestPromise } from "@/modules/catalog/delivery";
 import type { Order } from "@/modules/orders";
 
 const date = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
@@ -7,6 +8,11 @@ export const formatOrderDate = (d: Date) => date.format(d);
 
 /** What was bought and paid for, from the purchase-time snapshot. Shared by confirmation and order history. */
 export function OrderDetail({ order }: { order: Order }) {
+  const promise = order.paidAt
+    ? slowestPromise(
+        order.items.map((i) => deliveryPromise({ now: order.paidAt as Date, fulfilment: i.fulfilment, handlingMinutes: 0, postalCode: order.address.postalCode })),
+      )
+    : null;
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-14">
       <section aria-labelledby="order-items">
@@ -53,7 +59,12 @@ export function OrderDetail({ order }: { order: Order }) {
           </div>
         </dl>
         <div className="space-y-1 text-sm">
-          <h3 className="font-semibold">Shipping to</h3>
+          {promise ? (
+          <p className="pb-2 text-sm" data-testid="delivery-promise">
+            Promised delivery <span className="font-semibold">{promise.label}</span>
+          </p>
+        ) : null}
+        <h3 className="font-semibold">Shipping to</h3>
           <p>{order.address.name}</p>
           <p>{order.address.line1}</p>
           {order.address.line2 ? <p>{order.address.line2}</p> : null}

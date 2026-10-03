@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { addToCartAction } from "@/app/actions";
 import type { FormState } from "@/app/form-state";
-import { LocalTime } from "@/components/orders/local-time";
+import { DeliveryLine } from "./delivery-line";
 import { Button } from "@/components/ui/button";
 import { formatUsd } from "@/lib/money";
 import type { OfferView } from "@/modules/catalog/offers";
@@ -11,7 +11,6 @@ import type { OfferView } from "@/modules/catalog/offers";
 function OfferRow({ variantId, offer, deliveryBase }: { variantId: string; offer: OfferView; deliveryBase: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(addToCartAction, {});
   const soldOut = offer.stock < 1;
-  const eta = new Date(new Date(deliveryBase).getTime() + offer.handlingMinutes * 60_000).toISOString();
   return (
     <li className="py-4">
       <form action={action} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1">
@@ -25,7 +24,7 @@ function OfferRow({ variantId, offer, deliveryBase }: { variantId: string; offer
             <p className="text-sm text-muted-foreground">Out of stock</p>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Get it by <LocalTime iso={eta} />
+              <DeliveryLine nowIso={deliveryBase} legs={[offer]} />
             </p>
           )}
         </div>

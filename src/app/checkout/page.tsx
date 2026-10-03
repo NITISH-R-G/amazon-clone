@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { deliveryPromise, slowestPromise } from "@/modules/catalog/delivery";
 import { getApp } from "@/server/runtime";
 import { readActor, readUser } from "@/server/session";
 
@@ -31,6 +32,9 @@ export default async function CheckoutPage() {
       </Empty>
     );
   }
+
+  const now = new Date();
+  const delivery = slowestPromise(cart.lines.map((l) => deliveryPromise({ now, fulfilment: l.fulfilment, handlingMinutes: l.handlingMinutes })));
 
   if (cart.lines.some((l) => !l.available)) {
     return (
@@ -75,7 +79,7 @@ export default async function CheckoutPage() {
       <CheckoutForm
         mode={app.payments.provider.kind}
         idempotencyKey={crypto.randomUUID()}
-        summary={{ lines: cart.lines, ...quote.value }}
+        summary={{ lines: cart.lines, ...quote.value, delivery: delivery?.label ?? null }}
         defaults={user ? { name: user.name, contactEmail: user.email } : undefined}
       />
     </div>

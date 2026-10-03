@@ -55,6 +55,7 @@ type Summary = {
   shippingCents: number;
   taxCents: number;
   totalCents: number;
+  delivery?: string | null;
 };
 
 function SummaryLines({ summary }: { summary: Summary }) {
@@ -70,6 +71,11 @@ function SummaryLines({ summary }: { summary: Summary }) {
           </li>
         ))}
       </ul>
+      {summary.delivery ? (
+        <p className="text-sm text-muted-foreground">
+          Arrives <span className="font-medium text-foreground">{summary.delivery}</span>
+        </p>
+      ) : null}
       <dl className="num space-y-2 border-t border-input pt-3 text-[15px]">
         <div className="flex justify-between">
           <dt>Items</dt>

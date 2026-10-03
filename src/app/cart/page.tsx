@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { removeItemAction, restoreItemAction } from "@/app/actions";
 import { CartQuantityForm } from "@/components/cart/cart-quantity-form";
+import { DeliveryLine } from "@/components/product/delivery-line";
 import { PriceBlock } from "@/components/product/price-block";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
 
   const actor = await readActor();
   const app = await getApp();
+  const nowIso = new Date().toISOString();
   const cart = actor ? await app.cart.getCart(actor) : { lines: [], itemCount: 0, subtotalCents: 0 };
 
   const removedLineId = one("removed");
@@ -108,6 +110,9 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                     {line.fulfilment === "seller" ? ` · ships from the seller${line.shippingCents > 0 ? `, $${(line.shippingCents / 100).toFixed(2)} shipping` : ", free shipping"}` : " · fulfilled by Cartly"}
                   </p>
                   {line.sku ? <p className="num text-xs text-muted-foreground">SKU {line.sku}</p> : null}
+                  <p className="text-sm text-muted-foreground">
+                    <DeliveryLine nowIso={nowIso} legs={[line]} />
+                  </p>
                   <PriceBlock cents={line.unitPriceCents} listCents={line.listPriceCents} size="sm" />
                   {!line.available ? (
                     <p role="alert" className="text-sm font-medium text-destructive">
