@@ -1,5 +1,6 @@
 import { Lock } from "lucide-react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -42,6 +43,10 @@ export default async function PayPage({ params }: PageProps<"/checkout/pay/[id]"
   }
 
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  // Stripe needs an absolute return URL: the origin this request was made to.
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const failed = payment?.status === "failed";
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -68,7 +73,7 @@ export default async function PayPage({ params }: PageProps<"/checkout/pay/[id]"
               <StripePayment
                 publishableKey={publishableKey}
                 clientSecret={clientSecret}
-                returnUrl={`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmation/${id}`}
+                returnUrl={`${proto}://${host}/checkout/confirmation/${id}`}
                 totalCents={order.totalCents}
               />
               <p className="flex items-start gap-2 text-sm text-muted-foreground">
