@@ -29,7 +29,7 @@ Package manager: `pnpm`. Scripts: `pnpm dev|build|typecheck|lint|test|e2e`.
 
 ### Issue tracker
 
-Issues live in GitHub Issues via the `gh` CLI. No git remote is configured yet; see `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues via the `gh` CLI. The remote is `origin` (https://github.com/NITISH-R-G/amazon-clone.git, branch `main`); see `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
