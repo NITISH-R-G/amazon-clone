@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TYPE_DEFS } from "@/db/catalog/generate";
 import { createTestApp } from "@/test-support/app";
-import { CONCEPTS, interpretQuery, mergeCandidates } from "./internal/semantic";
+import { CONCEPTS, fuse, interpretQuery, WEIGHTS_EXACT, WEIGHTS_MEANING, withFallback } from "./internal/semantic";
 
 describe("concept-based query understanding (pure)", () => {
   it("T127: every product type named in the lexicon exists in the catalogue", () => {
@@ -19,11 +19,27 @@ describe("concept-based query understanding (pure)", () => {
     expect(interpretQuery("gift for a runner")).toEqual(interpretQuery("gift for a runner"));
   });
 
-  it("T129: merging keeps one copy of each product and puts the right source first", () => {
-    const lexical = [{ id: "a" }, { id: "b" }];
-    const semantic = [{ id: "b" }, { id: "c" }];
-    expect(mergeCandidates(lexical, semantic, false).map((x) => x.id)).toEqual(["a", "b", "c"]);
-    expect(mergeCandidates(lexical, semantic, true).map((x) => x.id)).toEqual(["b", "c", "a"]);
+  it("T129: fusion scores both sources plus rating, once per product, deterministically", () => {
+    const p = (id: string, rating = 4) => ({ id, rating });
+    const lexical = [p("a"), p("b")];
+    const semantic = [p("b"), p("c")];
+    const exact = fuse(lexical, semantic, WEIGHTS_EXACT);
+    expect(new Set(exact.map((x) => x.id)).size).toBe(3);
+    // score = 0.6/(1+lexRank) + 0.3/(1+semRank) + 0.1*rating/5
+    expect(Object.fromEntries(exact.map((x) => [x.id, x.hybridScore]))).toEqual({ a: 0.68, b: 0.68, c: 0.23 });
+    expect(exact.map((x) => x.id)).toEqual(["a", "b", "c"]); // a tie orders by id
+    // Trusting the meaning instead: b is in both lists and now clearly leads.
+    expect(fuse(lexical, semantic, WEIGHTS_MEANING).map((x) => x.id)[0]).toBe("b");
+    // A semantic-only leader overtakes a lexical-only hit when the meaning is trusted.
+    expect(fuse([p("a")], [p("c")], WEIGHTS_MEANING).map((x) => x.id)).toEqual(["c", "a"]);
+    expect(fuse(lexical, semantic, WEIGHTS_EXACT)).toEqual(fuse(lexical, semantic, WEIGHTS_EXACT));
+    // Equal scores order by id.
+    expect(fuse([p("z")], [p("y")], { lexical: 1, semantic: 1, business: 0 }).map((x) => x.id)).toEqual(["y", "z"]);
+  });
+
+  it("T131: a failing semantic stage returns the fallback instead of an error", async () => {
+    await expect(withFallback(async () => { throw new Error("vector store down"); }, "lexical-result")).resolves.toBe("lexical-result");
+    await expect(withFallback(async () => "hybrid-result", "lexical-result")).resolves.toBe("hybrid-result");
   });
 });
 

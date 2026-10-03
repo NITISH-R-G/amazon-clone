@@ -283,6 +283,14 @@ Out of scope: Prime, Rufus/Alexa+ assistant, ads/sponsored placement, seller fea
 
 - Reviews carry rating, title, body and a verified flag that only the service sets, from a delivered order of the signed-in user containing the product; one review per user and product. The displayed rating and count of a product are the aggregate of its reviews. Seeded reviews and reviewers are invented. Demo account: `demo@cartly.test` / `cartly-demo-1` (three delivered orders).
 
+## D32. Hybrid search: concept-based semantic candidates, lexical stays authoritative
+
+- **Not embeddings.** No vector database, pgvector or embedding model is used (none is installed, and a hosted embedding service would add a paid dependency and a production secret). Semantic retrieval is a deterministic concept lexicon (`search/internal/semantic.ts`) that maps what a query *means* ("keep my coffee hot on my commute", "gift for a runner") to the product types that satisfy it. It understands only what the lexicon covers.
+- **Flow:** lexical search runs first, unchanged. Only on page 1, without a chosen product type, with relevance sorting, and when the words found little (fewer than a page) or only a partial match, the concept layer fetches top-rated products of the implied types using the same filters, and the two candidate lists are fused.
+- **Fusion:** `score = w_lex / (1 + lexicalRank) + w_sem / (1 + semanticRank) + w_biz * rating / 5`; weights 0.6 / 0.3 / 0.1 when the lexical match was complete, 0.25 / 0.65 / 0.1 when it was partial or empty. Ties break on product id.
+- **Fallback:** any error in the semantic stage returns the plain lexical result. Exact queries, filters, facets, sorting and pagination are unchanged.
+- Demo query: `something to keep my coffee hot on my commute`.
+
 ## Review log
 
 | Date | Decision | Change |

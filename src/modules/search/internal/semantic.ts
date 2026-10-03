@@ -61,19 +61,44 @@ export function interpretQuery(query: string, maxTypes = 4): Intent | null {
   return { concepts: scored.slice(0, 3).map((x) => ({ label: x.c.label, hits: x.hits })), types: types.slice(0, maxTypes) };
 }
 
+export type FusionWeights = { lexical: number; semantic: number; business: number };
+
+/** The lexical match was complete: trust the words. Otherwise (partial or empty) trust the meaning. */
+export const WEIGHTS_EXACT: FusionWeights = { lexical: 0.6, semantic: 0.3, business: 0.1 };
+export const WEIGHTS_MEANING: FusionWeights = { lexical: 0.25, semantic: 0.65, business: 0.1 };
+
 /**
- * Deterministic merge of the two candidate sources. When the lexical search only relaxed (matched some of the words)
- * or found nothing, meaning-based candidates lead; when it matched every word, they follow. No product appears twice.
+ * Deterministic hybrid ranking over two candidate lists (each already in its own rank order):
+ *
+ *   score = lexical * 1/(1 + lexicalRank)  +  semantic * 1/(1 + semanticRank)  +  business * rating/5
+ *
+ * A product missing from a list contributes 0 for that term. Ties break on product id. No product appears twice.
+ * `business` is the product's existing rating signal; filters were already applied to both candidate lists.
  */
-export function mergeCandidates<T extends { id: string }>(lexical: T[], semantic: T[], semanticFirst: boolean): T[] {
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const list of semanticFirst ? [semantic, lexical] : [lexical, semantic]) {
-    for (const item of list) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      out.push(item);
-    }
+export function fuse<T extends { id: string; rating: number }>(
+  lexical: T[],
+  semantic: T[],
+  weights: FusionWeights,
+): (T & { hybridScore: number })[] {
+  const lexRank = new Map(lexical.map((p, i) => [p.id, i]));
+  const semRank = new Map(semantic.map((p, i) => [p.id, i]));
+  const byId = new Map<string, T>();
+  for (const p of [...lexical, ...semantic]) if (!byId.has(p.id)) byId.set(p.id, p);
+  return [...byId.values()]
+    .map((p) => {
+      const l = lexRank.has(p.id) ? 1 / (1 + (lexRank.get(p.id) as number)) : 0;
+      const m = semRank.has(p.id) ? 1 / (1 + (semRank.get(p.id) as number)) : 0;
+      const hybridScore = Math.round((weights.lexical * l + weights.semantic * m + weights.business * (p.rating / 5)) * 10_000) / 10_000;
+      return { ...p, hybridScore };
+    })
+    .sort((a, b) => b.hybridScore - a.hybridScore || a.id.localeCompare(b.id));
+}
+
+/** Runs the optional semantic stage; any failure yields the fallback (the lexical result) instead of an error. */
+export async function withFallback<T>(attempt: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await attempt();
+  } catch {
+    return fallback;
   }
-  return out;
 }

@@ -8,7 +8,7 @@ import {
   type TextMatch,
 } from "@/modules/catalog";
 import type { ProductSummary, SearchQuery, SearchResult, Suggestion } from "../types";
-import { interpretQuery, mergeCandidates } from "./semantic";
+import { fuse, interpretQuery, WEIGHTS_EXACT, WEIGHTS_MEANING, withFallback } from "./semantic";
 
 export const DEFAULT_PAGE_SIZE = 12;
 
@@ -112,34 +112,34 @@ export function createSearch({ catalog }: SearchDeps) {
     // Hybrid step: meaning-based candidates join the lexical ones when the words alone found little (or only a partial
     // match). Any failure here falls back to the plain lexical result.
     if (hasText && query.page === 1 && !query.typeSlug && !query.ids && sort === "relevance" && (relaxed || found.total < pageSize)) {
-      try {
+      const hybrid = await withFallback<SearchResult | null>(async () => {
         const intent = interpretQuery(query.text as string);
-        if (intent) {
-          const pages = await Promise.all(
-            intent.types.map((typeSlug, i) =>
-              catalog.findProducts({ ...baseCriteria, typeSlug, sort: "rating", page: 1, pageSize: 6, withFacets: found.total === 0 && i === 0 }),
-            ),
-          );
-          const semantic = pages.flatMap((pg) => pg.products).map((p) => summarise(p, p.categoryId ? (nameById.get(p.categoryId) ?? null) : null));
-          const lexicalIds = new Set(summarised.map((p) => p.id));
-          const added = semantic.filter((p) => !lexicalIds.has(p.id));
-          if (added.length > 0) {
-            const merged = mergeCandidates(summarised, semantic, relaxed || found.total === 0).slice(0, pageSize);
-            return {
-              items: merged,
-              total: Math.max(found.total, merged.length),
-              page: 1,
-              pageCount: found.total > pageSize ? Math.ceil(found.total / pageSize) : 1,
-              pageSize,
-              relaxed: false,
-              facets: found.total === 0 ? pages[0].facets : found.facets,
-              semantic: { meaning: intent.concepts.map((c) => c.label), addedCount: added.length },
-            };
-          }
-        }
-      } catch {
-        // Semantic help is optional: keep the lexical result.
-      }
+        if (!intent) return null;
+        const pages = await Promise.all(
+          intent.types.map((typeSlug, i) =>
+            catalog.findProducts({ ...baseCriteria, typeSlug, sort: "rating", page: 1, pageSize: 6, withFacets: found.total === 0 && i === 0 }),
+          ),
+        );
+        const semantic = pages.flatMap((pg) => pg.products).map((p) => summarise(p, p.categoryId ? (nameById.get(p.categoryId) ?? null) : null));
+        const lexicalIds = new Set(summarised.map((p) => p.id));
+        const added = semantic.filter((p) => !lexicalIds.has(p.id));
+        if (added.length === 0) return null;
+        const meaningLed = relaxed || found.total === 0;
+        const merged = fuse(summarised, semantic, meaningLed ? WEIGHTS_MEANING : WEIGHTS_EXACT)
+          .slice(0, pageSize)
+          .map((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== "hybridScore")) as ProductSummary);
+        return {
+          items: merged,
+          total: Math.max(found.total, merged.length),
+          page: 1,
+          pageCount: found.total > pageSize ? Math.ceil(found.total / pageSize) : 1,
+          pageSize,
+          relaxed: false,
+          facets: found.total === 0 ? pages[0].facets : found.facets,
+          semantic: { meaning: intent.concepts.map((c) => c.label), addedCount: added.length },
+        };
+      }, null);
+      if (hybrid) return hybrid;
     }
 
     return {
